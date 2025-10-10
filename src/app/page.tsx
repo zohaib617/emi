@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, X, Search, DollarSign, UserPlus, FileText, CheckCircle, Clock, LogIn, LogOut } from 'lucide-react'; 
+import { Menu, X, Search, DollarSign, UserPlus, FileText, CheckCircle, Clock, LogIn, LogOut } from 'lucide-react'; // Added LogOut icon
 import { createClient } from '@supabase/supabase-js';
 
 // --- Supabase Client Initialization ---
@@ -15,9 +15,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // =========================================================================
 //                  TYPE DEFINITIONS (Interfaces)
 // =========================================================================
-
-// Fix 1: Define a precise type for the change event that covers all your form fields
-type OnChangeEvent = ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
 
 interface VehicleSummary {
     id: string; item_name: string; monthly_installment: number; remaining_loan: number; installment_plan: string; next_due_date: string; created_at: string; total_amount: number; advance_payment: number;
@@ -68,8 +65,7 @@ interface BalanceResultType {
     history: InstallmentHistory[];
 }
 
-// Fix 1: Use the precise OnChangeEvent type instead of the generic FormChangeHandler
-type FormChangeHandler = (e: OnChangeEvent) => void;
+type FormChangeHandler = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
 
 interface MessageState {
   text: string;
@@ -163,7 +159,7 @@ interface FormFieldProps {
   name: string;
   type?: string;
   value: string | number;
-  onChange: FormChangeHandler; // Fix 1: Using the precise type
+  onChange: FormChangeHandler;
   placeholder?: string;
   isRequired?: boolean;
   isTextArea?: boolean;
@@ -181,7 +177,7 @@ const FormField: React.FC<FormFieldProps> = ({ label, name, type = 'text', value
       <textarea
         name={name}
         value={value as string}
-        onChange={onChange} // Fix 1: Removed 'as any'
+        onChange={onChange as any}
         placeholder={placeholder || ''}
         required={isRequired}
         className="p-3 border-2 border-slate-300 rounded-xl focus:border-amber-500 transition duration-150 text-base md:text-lg text-right h-24 font-inter bg-slate-50"
@@ -192,7 +188,7 @@ const FormField: React.FC<FormFieldProps> = ({ label, name, type = 'text', value
         type={type}
         name={name}
         value={value}
-        onChange={onChange} // Fix 1: Removed 'as any'
+        onChange={onChange as any}
         placeholder={placeholder || ''}
         required={isRequired}
         readOnly={isReadonly}
@@ -236,9 +232,7 @@ const GuarantorFields: React.FC<GuarantorFieldsProps> = ({ number, formState, ha
 // =========================================================================
 
 interface MenuButtonProps {
-  // Fix 1: Replaced 'any' with a more specific type if possible, or React.ElementType if it's a component. 
-  // Since it comes from 'lucide-react', React.ElementType is safer than 'any'.
-  icon: React.ElementType; 
+  icon: React.ComponentType<any>;
   label: string;
   menuKey: string;
   activeMenu: string;
@@ -392,11 +386,9 @@ const RenderPayment: React.FC<RenderPaymentProps> = ({ formState, setFormState, 
     const handleChange: FormChangeHandler = (e) => {
       let value: string | number = e.target.value;
       if (e.target.name === 'totalAmount' || e.target.name === 'advance') {
-        // Fix 1: Removed 'as any' for the type cast
-        value = parseFloat(e.target.value as string) || 0; 
+        value = parseFloat(value as string) || 0;
       }
-      // Fix 1: Removed 'as any' for the type cast
-      setFormState({ ...formState, [e.target.name]: value }); 
+      setFormState({ ...formState, [e.target.name]: value as any });
     };
 
     return (
@@ -501,11 +493,9 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
     const handleChange: FormChangeHandler = (e) => {
       let value: string | number = e.target.value;
       if (e.target.name === 'installmentAmount') {
-        // Fix 1: Removed 'as any' for the type cast
-        value = parseFloat(e.target.value as string) || 0; 
+        value = parseFloat(value as string) || 0;
       }
-      // Fix 1: Removed 'as any' for the type cast
-      setSearchForm({ ...searchForm, [e.target.name]: value }); 
+      setSearchForm({ ...searchForm, [e.target.name]: value as any });
     };
 
     return (
@@ -672,7 +662,6 @@ interface RenderCheckBalanceProps {
 const RenderCheckBalance: React.FC<RenderCheckBalanceProps> = ({ formState, setFormState, handleSubmit, loading, balanceResult }) => {
     const handleChange: FormChangeHandler = (e) => {
       if (e.target.name === 'searchType') {
-          // Fix 1: Removed 'as' type casting
           setFormState({ ...formState, [e.target.name]: e.target.value as 'accountNumber' | 'registrationNumber' });
       } else {
           setFormState({ ...formState, [e.target.name]: e.target.value });
@@ -1015,8 +1004,7 @@ const App: React.FC = () => {
 
     if (error) {
         console.error("Supabase Error:", error);
-        // Fix 1: Properly access the Supabase error message
-        showMessage(URDU_LABELS.general.error + " " + error.message, 'error'); 
+        showMessage(URDU_LABELS.general.error + " " + (error as any).message, 'error');
     } else {
         showMessage(URDU_LABELS.general.success + " صارف رجسٹر ہو گیا!", 'success');
         setRegisterForm(registerFormInitialState);
@@ -1030,7 +1018,6 @@ const App: React.FC = () => {
     setInstallmentPayDetail(null);
     setMessage({ text: '', type: '' });
 
-    // Define a type for the data structure expected from Supabase select with an active vehicle
     type SupabaseCustomerResult = {
         id: string; customer_name: string; account_number: string;
         vehicles: VehicleSummary[] | null;
@@ -1038,21 +1025,19 @@ const App: React.FC = () => {
 
     const { data, error } = await supabase
         .from('customers')
-        .select(`id, customer_name, account_number, vehicles (id, item_name, monthly_installment, remaining_loan, installment_plan, next_due_date, created_at, advance_payment)`)
+        // FIX: Added 'total_amount' to the vehicles select list to satisfy the VehicleSummary interface.
+        .select(`id, customer_name, account_number, vehicles (id, item_name, monthly_installment, remaining_loan, installment_plan, next_due_date, created_at, total_amount, advance_payment)`)
         .eq('account_number', accountNumber)
         .limit(1)
         .single();
     
     setLoading(false);
 
-    // Supabase returns 'PGRST116' (No rows found) when single() returns nothing.
-    if (error && error.code !== 'PGRST116') {
+    if (error && (error as any).code !== 'PGRST116') {
         console.error("Supabase Error:", error);
-        // Fix 1: Properly access the Supabase error message
-        showMessage(URDU_LABELS.general.error + " تلاش میں غلطی: " + error.message, 'error'); 
+        showMessage(URDU_LABELS.general.error + " تلاش میں غلطی.", 'error');
     } else if (data) {
-        // Fix 1: Removed 'as SupabaseCustomerResult' here as Supabase usually infers types well if possible, or we check the data structure.
-        const typedData = data; 
+        const typedData = data as SupabaseCustomerResult;
         const activeVehicle = typedData?.vehicles?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] || null;
         
         if (typedData && typedData.id && typedData.customer_name && typedData.account_number) {
@@ -1067,8 +1052,7 @@ const App: React.FC = () => {
         if (activeVehicle && activeVehicle.id && activeMenu === 'installmentPay') {
             
             type InstallmentData = { payment_date: string; paid_count: number; remaining_balance: number }[];
-            // Fix 1: Removed 'instError' warning by using underscore for unused variable
-            const { data: installmentData, error: _instError } = await supabase 
+            const { data: installmentData, error: instError } = await supabase
                 .from('installments')
                 .select('payment_date, paid_count, remaining_balance')
                 .eq('vehicle_id', activeVehicle.id)
@@ -1148,19 +1132,17 @@ const App: React.FC = () => {
         .select('id')
         .single();
         
-      // Fix 1: Properly check for insert data and access its property.
-      if (vehicleError || !vehicleInsert || !('id' in vehicleInsert)) {
+      if (vehicleError || !(vehicleInsert as any)?.id) {
         console.error("Supabase Vehicle Error:", vehicleError);
         showMessage(URDU_LABELS.general.error + " گاڑی کا ڈیٹا محفوظ نہیں ہو سکا۔", 'error');
         setLoading(false);
         return;
       }
       
-      // Fix 1: Safely access the ID property.
-      const vehicleId = vehicleInsert.id;
+      const vehicleId = (vehicleInsert as any).id as string;
       
       // 2. ایڈوانس پیمنٹ کو پہلی قسط کے طور پر ریکارڈ کریں (Insert into 'installments' table)
-      // Advance payment should ideally be count 0, first installment is count 1.
+      const paidCount = advance > 0 ? 0 : 0; // Advance payment should ideally be count 0, first installment is count 1.
       
       // We insert the advance payment record first.
       if (advance > 0) {
@@ -1211,8 +1193,7 @@ const App: React.FC = () => {
     const remaining = remaining_loan - amount;
     
     // Increment paid count by 1 only if the payment covers the monthly installment amount
-    // Fix 1: Removed 'paidCount' warning by renaming the variable 
-    const newPaidCount = paid_count + (amount >= monthly_installment ? 1 : 0); 
+    const newPaidCount = paid_count + (amount >= monthly_installment ? 1 : 0);
     
     // 1. قسط کا ریکارڈ محفوظ کریں (Insert into 'installments' table)
     const installmentRecord = {
@@ -1268,20 +1249,18 @@ const App: React.FC = () => {
     
     const { searchKey, searchType } = checkBalanceForm;
     
-    // Fix 2: Changed 'let' to 'const' where reassignment is not needed (prefer-const rule)
-    let customerId: string | null = null; 
+    let customerId: string | null = null;
     
     // Step 1: Find Customer ID if searching by Account Number
     if (searchType === 'accountNumber') {
-        // Fix 1: Removed 'cError' warning by using underscore for unused variable
-        const { data: customerData, error: _cError } = await supabase 
+        const { data: customerData, error: cError } = await supabase
             .from('customers')
             .select('id')
             .eq('account_number', searchKey)
             .limit(1)
             .single();
             
-        if (!customerData) {
+        if (cError || !customerData) {
             showMessage(URDU_LABELS.general.notFound, 'error');
             setLoading(false);
             return;
@@ -1302,11 +1281,10 @@ const App: React.FC = () => {
         query = query.eq('registration_number', searchKey);
     }
     
-    // Fix 1: Defined a type for the complex data structure instead of 'any'
-    type VehicleDataResult = (VehicleSummary & { customer: { customer_name: string } }) | null; 
+    type VehicleDataResult = (VehicleSummary & { customer: { customer_name: string } }) | null;
     
     const { data: vehicleDataRaw, error: vError } = await query.single();
-    const vehicleData = vehicleDataRaw as VehicleDataResult; // Safe to cast as we defined the result type
+    const vehicleData = vehicleDataRaw as VehicleDataResult;
 
     if (vError || !vehicleData || !vehicleData.customer) {
         showMessage(URDU_LABELS.general.notFound, 'error');
@@ -1317,29 +1295,22 @@ const App: React.FC = () => {
     // Step 3: Fetch all installment history
     type AllInstallmentsResult = InstallmentHistory[] | null;
     
-    // Fix 1: Removed 'iError' warning by using underscore for unused variable
-    const { data: installmentHistoryRaw, error: _iError } = await supabase
+    const { data: installmentHistoryRaw, error: iError } = await supabase
         .from('installments')
         .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
         .eq('vehicle_id', vehicleData.id)
         .order('payment_date', { ascending: true }); // Order by date for the history list
     
-    const history = (installmentHistoryRaw as AllInstallmentsResult) || []; // Safe to cast as we defined the result type
+    const history = (installmentHistoryRaw as AllInstallmentsResult) || [];
     
     // Step 4: Determine current status (using the latest record for balance and count)
     const latestInst = history.sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
     
     const planLength = vehicleData.installment_plan === '12 Months' ? 12 : 24;
     
-    // Fix 2: Changed 'let' to 'const' where reassignment is not needed (prefer-const rule)
-    // The variables are calculated once based on conditions, so they should be 'const'
-    const currentPaidCount = latestInst?.paid_count || 0;
-    const currentRemainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; 
-    const currentNextDueDate = vehicleData.next_due_date;
-    
-    let paidCount = currentPaidCount;
-    let remainingLoan = currentRemainingLoan;
-    let nextDueDate = currentNextDueDate;
+    let paidCount = latestInst?.paid_count || 0;
+    let remainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; // Use latest balance or initial remaining loan
+    let nextDueDate = vehicleData.next_due_date;
     
     // Recalculate paid count if advance payment was recorded as count 0
     if (history.length > 0) {
