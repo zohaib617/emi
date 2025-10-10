@@ -1018,8 +1018,11 @@ const App: React.FC = () => {
     setInstallmentPayDetail(null);
     setMessage({ text: '', type: '' });
 
-    // FIX: Removed unused type alias SupabaseCustomerResult (Warning 1)
-    
+    type SupabaseCustomerResult = {
+        id: string; customer_name: string; account_number: string;
+        vehicles: VehicleSummary[] | null;
+    } | null;
+
     const { data, error } = await supabase
         .from('customers')
         .select(`id, customer_name, account_number, vehicles (id, item_name, monthly_installment, remaining_loan, installment_plan, next_due_date, created_at, advance_payment)`)
@@ -1033,9 +1036,8 @@ const App: React.FC = () => {
         console.error("Supabase Error:", error);
         showMessage(URDU_LABELS.general.error + " تلاش میں غلطی.", 'error');
     } else if (data) {
-        // FIX: Replaced casting with `any` as a quick fix for the removed type alias
-        const typedData = data as any; 
-        const activeVehicle = typedData?.vehicles?.sort((a: VehicleSummary, b: VehicleSummary) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] || null;
+        const typedData = data as SupabaseCustomerResult;
+        const activeVehicle = typedData?.vehicles?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] || null;
         
         if (typedData && typedData.id && typedData.customer_name && typedData.account_number) {
           setFetchedCustomer({
@@ -1049,8 +1051,7 @@ const App: React.FC = () => {
         if (activeVehicle && activeVehicle.id && activeMenu === 'installmentPay') {
             
             type InstallmentData = { payment_date: string; paid_count: number; remaining_balance: number }[];
-            // FIX: Renamed instError to _instError to silence unused variable warning (Warning 2)
-            const { data: installmentData, error: _instError } = await supabase 
+            const { data: installmentData, error: _instError } = await supabase // CHANGED: error: instError -> error: _instError
                 .from('installments')
                 .select('payment_date, paid_count, remaining_balance')
                 .eq('vehicle_id', activeVehicle.id)
@@ -1251,15 +1252,13 @@ const App: React.FC = () => {
     
     // Step 1: Find Customer ID if searching by Account Number
     if (searchType === 'accountNumber') {
-        // FIX: Renamed cError to _cError to silence unused variable warning (Warning 3)
-        const { data: customerData, error: _cError } = await supabase
+        const { data: customerData, error: _cError } = await supabase // CHANGED: error: cError -> error: _cError
             .from('customers')
             .select('id')
             .eq('account_number', searchKey)
             .limit(1)
             .single();
             
-        // FIX: Updated usage of cError to _cError
         if (_cError || !customerData) {
             showMessage(URDU_LABELS.general.notFound, 'error');
             setLoading(false);
@@ -1295,8 +1294,7 @@ const App: React.FC = () => {
     // Step 3: Fetch all installment history
     type AllInstallmentsResult = InstallmentHistory[] | null;
     
-    // FIX: Renamed iError to _iError to silence unused variable warning (Warning 4)
-    const { data: installmentHistoryRaw, error: _iError } = await supabase 
+    const { data: installmentHistoryRaw, error: _iError } = await supabase // CHANGED: error: iError -> error: _iError
         .from('installments')
         .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
         .eq('vehicle_id', vehicleData.id)
@@ -1310,10 +1308,8 @@ const App: React.FC = () => {
     const planLength = vehicleData.installment_plan === '12 Months' ? 12 : 24;
     
     let paidCount = latestInst?.paid_count || 0;
-    // FIX: Changed 'let' to 'const' to fix Error 1
-    const remainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; 
-    // FIX: Changed 'let' to 'const' to fix Error 2
-    const nextDueDate = vehicleData.next_due_date;
+    const remainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; // FIX: Changed 'let' to 'const'
+    const nextDueDate = vehicleData.next_due_date; // FIX: Changed 'let' to 'const'
     
     // Recalculate paid count if advance payment was recorded as count 0
     if (history.length > 0) {
