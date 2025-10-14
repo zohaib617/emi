@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, X, Search, DollarSign, UserPlus, FileText, CheckCircle, Clock, LogIn, LogOut } from 'lucide-react'; // Added LogOut icon
+import React, { useState, useEffect, useCallback, ChangeEvent, useMemo, useRef } from 'react';
+import { Menu, X, Search, DollarSign, UserPlus, FileText, CheckCircle, Clock, LogIn, LogOut, Printer, ListOrdered } from 'lucide-react'; // Fixed import: use lucide-react
 import { createClient } from '@supabase/supabase-js';
+import * as ReactDOMServer from 'react-dom/server'; // For printing logic
 
 // --- Supabase Client Initialization ---
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'REPLACE_WITH_YOUR_SUPABASE_PROJECT_URL';
@@ -16,8 +17,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 //                  TYPE DEFINITIONS (Interfaces)
 // =========================================================================
 
+interface GuarantorDetails {
+    name: string; father_name: string; phone: string; cnic: string; address: string;
+}
+
 interface VehicleSummary {
-    id: string; item_name: string; monthly_installment: number; remaining_loan: number; installment_plan: string; next_due_date: string; created_at: string; total_amount: number; advance_payment: number;
+    id: string; item_name: string; monthly_installment: number; remaining_loan: number; installment_plan: string; next_due_date: string; created_at: string; total_amount: number; advance_payment: number; registration_number: string;
 }
 
 interface CustomerType {
@@ -25,6 +30,42 @@ interface CustomerType {
   customer_name: string;
   account_number: string;
   vehicles?: VehicleSummary | null;
+}
+
+// New type for All Records Table
+interface CustomerRecord {
+  id: string;
+  account_number: string;
+  customer_name: string;
+  vehicle_name: string;
+  remaining_loan: number;
+  created_at: string;
+}
+
+// New type for Full Details View
+interface FullCustomerDetails {
+    id: string;
+    account_number: string;
+    customer_name: string;
+    father_name: string;
+    phone: string;
+    cnic: string;
+    address: string;
+    guarantor1_details: GuarantorDetails;
+    guarantor2_details: GuarantorDetails;
+    vehicle: VehicleSummary & {
+        engine_number: string;
+        chassis_number: string;
+        model: string;
+        color: string;
+        insurance_docs: string;
+    };
+    history: InstallmentHistory[];
+    totalPaidCount: number;
+    remainingCount: number;
+    totalPaidAmount: number;
+    totalInstallmentAmount: number;
+    planLength: number;
 }
 
 interface InstallmentPayDetailType {
@@ -98,10 +139,11 @@ const URDU_LABELS = {
   appName: "نواب سرحدی آٹوز",
   tagline: "قسطوں پر گاڑیوں کے لین دین کا نظام",
   menu: {
-    register: "صارف رجسٹر کریں",
+    register: "Add Customer",
     payment: "Payment",
     installmentPay: "Installment Pay",
     checkBalance: "Check Balance",
+    allRecords: "All Record", // NEW: All Records Menu Item
   },
   general: {
     save: "محفوظ کریں",
@@ -118,10 +160,16 @@ const URDU_LABELS = {
     advance: "ایڈوانس",
     bakaya: "بقایا قرض",
     logout: "لاگ آؤٹ", // Added Urdu label for Logout
+    allRecords: "تمام صارفین اور گاڑیوں کا ریکارڈ", // NEW: All Records Page Title
+    viewDetails: "تفصیلات دیکھیں", // NEW: View Details Button
+    print: "پرنٹ کریں", // NEW: Print Button
+    close: "بند کریں", // NEW: Close Button
+    totalPaid: "کل ادا شدہ رقم", // NEW: Total Paid Amount
+    planLength: "کل قسطیں (Plann)", // NEW: Plan Length
   },
   fields: {
     accountNumber: "اکاؤنٹ نمبر",
-    customerName: "نام",
+    customerName: "  نام",
     fatherName: "والد کا نام",
     phone: "فون نمبر",
     address: "گھر کا پتہ",
@@ -147,6 +195,11 @@ const URDU_LABELS = {
     installmentNo: "قسط نمبر",
     amountPaid: "ادا کی گئی رقم",
     remainingAfter: "بقایا (بعد از ادائیگی)",
+    vehicleName: "گاڑی کا نام", // NEW: Vehicle Name
+    status: "حالت", // NEW: Status
+    totalInstallment: "کل قسطیں", // NEW: Total Installments
+    totalLoan: "کل قرض", // NEW: Total Loan
+    recordDate: "ریکارڈ کی تاریخ", // NEW: Record Date
   }
 };
 
@@ -301,6 +354,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, setIsSidebarOpen, acti
                 <MenuButton icon={DollarSign} label={URDU_LABELS.menu.payment} menuKey="payment" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
                 <MenuButton icon={FileText} label={URDU_LABELS.menu.installmentPay} menuKey="installmentPay" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
                 <MenuButton icon={Search} label={URDU_LABELS.menu.checkBalance} menuKey="checkBalance" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
+                {/* NEW: All Records Button */}
+                <MenuButton icon={ListOrdered} label={URDU_LABELS.menu.allRecords} menuKey="allRecords" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
             </nav>
             
             {/* Logout Button in Sidebar */}
@@ -577,24 +632,25 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
 
 
 // =========================================================================
-//                  NEW COMPONENT: Installment History List (Tree View)
+//                  Installment History List (Tree View)
 // =========================================================================
 
 interface InstallmentHistoryTreeProps {
     history: InstallmentHistory[];
+    isPrintView?: boolean;
 }
 
-const InstallmentHistoryTree: React.FC<InstallmentHistoryTreeProps> = ({ history }) => {
+const InstallmentHistoryTree: React.FC<InstallmentHistoryTreeProps> = ({ history, isPrintView = false }) => {
     if (history.length === 0) {
-        return <p className="text-center text-slate-500 text-xl font-medium mt-6">کوئی قسط کی تاریخ نہیں ملی۔</p>;
+        return <p className={`text-center ${isPrintView ? 'text-slate-700' : 'text-slate-500'} text-xl font-medium mt-6`}>کوئی قسط کی تاریخ نہیں ملی۔</p>;
     }
     
     // Sort oldest first for a true 'timeline' view
     const sortedHistory = [...history].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
 
     return (
-        <div className="relative border-r-4 border-slate-300 pr-8 mt-6 pb-2" dir="rtl">
-            <div className="absolute top-0 right-0 h-full w-4 flex flex-col items-center">
+        <div className="relative border-r-4 border-slate-300 pr-8 mt-6 pb-2 print:border-r-2 print:border-slate-500" dir="rtl">
+            <div className="absolute top-0 right-0 h-full w-4 flex flex-col items-center print:hidden">
                 {/* Vertical Line */}
                 <div className="h-full w-1 bg-slate-300"></div>
             </div>
@@ -613,29 +669,29 @@ const InstallmentHistoryTree: React.FC<InstallmentHistoryTreeProps> = ({ history
 
                 return (
                     <div key={record.id} className="mb-8 relative pl-6">
-                        {/* Circle marker on the timeline */}
-                        <div className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center ${borderColor} border-4 ${bgColor}`}>
+                        {/* Circle marker on the timeline (hide in print) */}
+                        <div className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center ${borderColor} border-4 ${bgColor} print:hidden`}>
                             <Icon size={14} className={titleColor} />
                         </div>
 
                         {/* Payment Card */}
-                        <div className={`p-4 rounded-xl shadow-lg transition duration-300 hover:shadow-xl ${bgColor} border-r-4 ${borderColor}`}>
-                            <div className="flex justify-between items-start border-b pb-2 mb-2">
-                                <h4 className={`text-xl font-extrabold ${titleColor}`}>{titleText}</h4>
-                                <p className="text-sm font-medium text-slate-500 flex items-center">
-                                    <Clock size={16} className="ml-1" />
+                        <div className={`p-4 rounded-xl shadow-lg transition duration-300 hover:shadow-xl ${bgColor} border-r-4 ${borderColor} print:p-2 print:rounded-md print:shadow-none print:border print:border-slate-500 print:bg-white print:hover:shadow-none`}>
+                            <div className="flex justify-between items-start border-b pb-2 mb-2 print:border-b-0 print:mb-1">
+                                <h4 className={`text-xl font-extrabold ${titleColor} print:text-sm print:font-bold print:text-slate-800`}>{titleText}</h4>
+                                <p className="text-sm font-medium text-slate-500 flex items-center print:text-xs print:text-slate-600">
+                                    <Clock size={16} className="ml-1 print:hidden" />
                                     {new Date(record.payment_date).toLocaleDateString('ur-PK', {
                                         year: 'numeric', month: 'short', day: 'numeric'
                                     })}
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-lg">
-                                <p className="font-bold text-slate-700">
-                                    {URDU_LABELS.fields.amountPaid}: <span className="font-extrabold text-2xl text-green-700 mr-2">{record.amount_paid.toLocaleString('en-US')}</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-lg print:text-xs">
+                                <p className="font-bold text-slate-700 print:text-slate-800">
+                                    {URDU_LABELS.fields.amountPaid}: <span className="font-extrabold text-2xl text-green-700 mr-2 print:text-sm print:text-green-700">{record.amount_paid.toLocaleString('en-US')}</span>
                                 </p>
-                                <p className="font-bold text-slate-700 text-left">
-                                    {URDU_LABELS.fields.remainingAfter}: <span className="font-medium text-slate-600 mr-2">{record.remaining_balance.toLocaleString('en-US')}</span>
+                                <p className="font-bold text-slate-700 text-left print:text-slate-800">
+                                    {URDU_LABELS.fields.remainingAfter}: <span className="font-medium text-slate-600 mr-2 print:text-sm print:text-slate-600">{record.remaining_balance.toLocaleString('en-US')}</span>
                                 </p>
                             </div>
                         </div>
@@ -770,6 +826,342 @@ const RenderCheckBalance: React.FC<RenderCheckBalanceProps> = ({ formState, setF
       </div>
     );
 };
+
+
+// =========================================================================
+//                  NEW COMPONENT: PrintableDetailsView
+// =========================================================================
+
+interface PrintableDetailsViewProps {
+    details: FullCustomerDetails;
+    onClose: () => void;
+}
+
+const InfoRow: React.FC<{ label: string; value: string | number | null; className?: string }> = ({ label, value, className = '' }) => (
+    <div className={`p-2 border-b border-slate-200 print:border-slate-400 flex justify-between print:text-xs ${className}`}>
+        <span className="font-bold text-slate-700 print:text-slate-800">{label}</span>
+        <span className="font-medium text-slate-600 text-left print:text-slate-700">{value !== null ? value.toLocaleString('en-US') : 'N/A'}</span>
+    </div>
+);
+
+const PrintableDetailsView: React.FC<PrintableDetailsViewProps> = ({ details, onClose }) => {
+    
+    const printRef = useRef<HTMLDivElement>(null);
+
+    const handlePrint = () => {
+        if (printRef.current) {
+            // Use browser's built-in print functionality
+            const printContent = printRef.current.outerHTML;
+            const printWindow = window.open('', '_blank');
+            if(printWindow) {
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>${details.customer_name} - ${details.account_number}</title>
+                            <style>
+                                @page { size: A4; margin: 15mm; }
+                                body { font-family: 'Arial', sans-serif; direction: rtl; text-align: right; }
+                                .print-container { padding: 10px; }
+                                .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+                                h1 { font-size: 24px; margin: 0; }
+                                h2 { font-size: 18px; margin-top: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+                                .section { margin-bottom: 20px; }
+                                .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+                                .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+                                .info-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted #ccc; font-size: 12px; }
+                                .info-row span:first-child { font-weight: bold; }
+                                .history-timeline { border-right: 1px solid #ccc; padding-right: 15px; }
+                                .history-item { margin-bottom: 10px; padding-right: 10px; border-right: 3px solid #666; position: relative; }
+                                .history-item::before { content: ''; position: absolute; right: -5px; top: 0; width: 10px; height: 10px; background: #666; border-radius: 50%; }
+                                .history-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 3px; margin-bottom: 5px;}
+                                .history-details { display: flex; justify-content: space-between; font-size: 11px;}
+                            </style>
+                        </head>
+                        <body>
+                            ${printContent}
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            }
+        }
+    };
+    
+    // Total amounts for summary
+    const totalPaidAmount = details.history.reduce((sum, rec) => sum + rec.amount_paid, 0);
+    const planLength = details.vehicle.installment_plan === '12 Months' ? 12 : 24;
+    const remainingCount = planLength - details.totalPaidCount;
+    
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" dir="rtl">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto print:max-h-none print:w-auto print:shadow-none print:rounded-none print:absolute print:inset-0 print:m-0" ref={printRef}>
+                
+                {/* Header and Controls */}
+                <div className="p-4 sm:p-6 sticky top-0 bg-white border-b-4 border-amber-600 z-10 print:hidden">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-4xl font-extrabold text-amber-700">ریکارڈ کی مکمل تفصیلات</h2>
+                        <button 
+                            onClick={onClose} 
+                            className="bg-red-500 hover:bg-red-600 text-white p-3 rounded-full font-bold transition flex items-center"
+                        >
+                            <X size={20} className="ml-2" />
+                            {URDU_LABELS.general.close}
+                        </button>
+                    </div>
+                    <button 
+                        onClick={handlePrint} 
+                        className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition flex items-center justify-center text-xl"
+                    >
+                        <Printer size={24} className="ml-2" />
+                        {URDU_LABELS.general.print}
+                    </button>
+                </div>
+                
+                {/* Printable Content Area */}
+                <div className="p-4 sm:p-6 print-container" id="printable-content">
+                    {/* Print Header (Only for Print) */}
+                    <div className="hidden print:block header">
+                        <h1 className="font-extrabold text-3xl">{URDU_LABELS.appName}</h1>
+                        <p className="text-sm">{URDU_LABELS.tagline}</p>
+                        <p className='mt-2 text-xl font-bold'>گاہک کا مکمل ریکارڈ</p>
+                    </div>
+
+                    {/* Customer Details */}
+                    <div className="section">
+                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">خریدار کی تفصیلات</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
+                            <InfoRow label={URDU_LABELS.fields.accountNumber} value={details.account_number} />
+                            <InfoRow label={URDU_LABELS.fields.customerName} value={details.customer_name} />
+                            <InfoRow label={URDU_LABELS.fields.fatherName} value={details.father_name} />
+                            <InfoRow label={URDU_LABELS.fields.phone} value={details.phone} />
+                            <InfoRow label={URDU_LABELS.fields.cnic} value={details.cnic} />
+                            <div className="md:col-span-2 print:col-span-3">
+                                <InfoRow label={URDU_LABELS.fields.address} value={details.address} />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Guarantor Details */}
+                    <div className="section">
+                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">{URDU_LABELS.fields.guarantor1}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
+                            <InfoRow label={URDU_LABELS.fields.customerName} value={details.guarantor1_details.name} />
+                            <InfoRow label={URDU_LABELS.fields.fatherName} value={details.guarantor1_details.father_name} />
+                            <InfoRow label={URDU_LABELS.fields.phone} value={details.guarantor1_details.phone} />
+                            <InfoRow label={URDU_LABELS.fields.cnic} value={details.guarantor1_details.cnic} />
+                            <div className="md:col-span-2 print:col-span-3">
+                                <InfoRow label={URDU_LABELS.fields.address} value={details.guarantor1_details.address} />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="section">
+                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">{URDU_LABELS.fields.guarantor2}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
+                            <InfoRow label={URDU_LABELS.fields.customerName} value={details.guarantor2_details.name} />
+                            <InfoRow label={URDU_LABELS.fields.fatherName} value={details.guarantor2_details.father_name} />
+                            <InfoRow label={URDU_LABELS.fields.phone} value={details.guarantor2_details.phone} />
+                            <InfoRow label={URDU_LABELS.fields.cnic} value={details.guarantor2_details.cnic} />
+                            <div className="md:col-span-2 print:col-span-3">
+                                <InfoRow label={URDU_LABELS.fields.address} value={details.guarantor2_details.address} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Vehicle Details */}
+                    <div className="section">
+                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">گاڑی اور مالی تفصیلات</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
+                            <InfoRow label={URDU_LABELS.fields.itemName} value={details.vehicle.item_name} />
+                            <InfoRow label={URDU_LABELS.fields.model} value={details.vehicle.model} />
+                            <InfoRow label={URDU_LABELS.fields.registrationNumber} value={details.vehicle.registration_number} />
+                            <InfoRow label={URDU_LABELS.fields.engineNumber} value={details.vehicle.engine_number} />
+                            <InfoRow label={URDU_LABELS.fields.chassisNumber} value={details.vehicle.chassis_number} />
+                            <InfoRow label={URDU_LABELS.fields.color} value={details.vehicle.color} />
+                            <InfoRow label={URDU_LABELS.fields.totalAmount} value={details.vehicle.total_amount} />
+                            <InfoRow label={URDU_LABELS.fields.advance} value={details.vehicle.advance_payment} />
+                            <InfoRow label={URDU_LABELS.fields.monthlyInstallment} value={details.vehicle.monthly_installment} />
+                            <InfoRow label={URDU_LABELS.fields.installmentPlan} value={details.vehicle.installment_plan} />
+                            <InfoRow label={URDU_LABELS.general.bakaya} value={details.vehicle.remaining_loan} className="font-extrabold text-red-700 print:text-red-800" />
+                            <InfoRow label={URDU_LABELS.general.dueDate} value={details.vehicle.next_due_date} className="font-extrabold text-amber-700 print:text-amber-800" />
+                        </div>
+                    </div>
+                    
+                    {/* Payment Summary */}
+                    <div className="section mt-6">
+                        <h2 className="text-3xl font-extrabold text-green-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">مالی حساب</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
+                            <div className='p-3 bg-green-100 rounded-xl shadow-inner print:p-2 print:bg-slate-100 print:shadow-none print:border'>
+                                <p className='text-lg font-bold text-green-700 print:text-sm print:text-slate-800'>{URDU_LABELS.general.totalPaid}</p>
+                                <p className='text-3xl font-extrabold text-green-900 mt-1 print:text-xl print:font-bold print:text-green-700'>{totalPaidAmount.toLocaleString('en-US')}</p>
+                            </div>
+                            <div className='p-3 bg-blue-100 rounded-xl shadow-inner print:p-2 print:bg-slate-100 print:shadow-none print:border'>
+                                <p className='text-lg font-bold text-blue-700 print:text-sm print:text-slate-800'>{URDU_LABELS.general.paid} ({URDU_LABELS.fields.totalInstallment})</p>
+                                <p className='text-3xl font-extrabold text-blue-900 mt-1 print:text-xl print:font-bold print:text-blue-700'>{details.totalPaidCount} / {planLength}</p>
+                            </div>
+                            <div className='p-3 bg-red-100 rounded-xl shadow-inner print:p-2 print:bg-slate-100 print:shadow-none print:border'>
+                                <p className='text-lg font-bold text-red-700 print:text-sm print:text-slate-800'>{URDU_LABELS.general.remaining} ({URDU_LABELS.fields.totalInstallment})</p>
+                                <p className='text-3xl font-extrabold text-red-900 mt-1 print:text-xl print:font-bold print:text-red-700'>{remainingCount < 0 ? 0 : remainingCount}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Installment History */}
+                    <div className="section mt-8">
+                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">{URDU_LABELS.general.history}</h2>
+                        <InstallmentHistoryTree history={details.history} isPrintView={true} />
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+// =========================================================================
+//                  NEW COMPONENT: RenderAllRecords (Table View)
+// =========================================================================
+
+interface RenderAllRecordsProps {
+    customerRecords: CustomerRecord[];
+    loading: boolean;
+    handleFetchAllCustomers: () => Promise<void>;
+    handleViewDetails: (customerId: string) => Promise<void>;
+}
+
+const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({ customerRecords, loading, handleFetchAllCustomers, handleViewDetails }) => {
+    
+    // Simple state for date range filtering
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredRecords = useMemo(() => {
+        let records = customerRecords;
+
+        // Date Filtering
+        if (startDate && endDate) {
+            records = records.filter(record => {
+                const recordDate = new Date(record.created_at);
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                // Set end time to end of day for inclusive filtering
+                end.setHours(23, 59, 59, 999);
+                return recordDate >= start && recordDate <= end;
+            });
+        }
+
+        // Search Filtering (Case-insensitive on Name, Account Number, Vehicle Name)
+        if (searchTerm) {
+            const lowerSearchTerm = searchTerm.toLowerCase();
+            records = records.filter(record => 
+                record.customer_name.toLowerCase().includes(lowerSearchTerm) ||
+                record.account_number.toLowerCase().includes(lowerSearchTerm) ||
+                record.vehicle_name.toLowerCase().includes(lowerSearchTerm)
+            );
+        }
+
+        return records;
+    }, [customerRecords, startDate, endDate, searchTerm]);
+
+    useEffect(() => {
+        handleFetchAllCustomers();
+    }, [handleFetchAllCustomers]);
+
+    return (
+        <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-7xl mx-auto" dir="rtl">
+            <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
+                {URDU_LABELS.general.allRecords}
+            </h2>
+
+            {/* Controls and Filters */}
+            <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 mb-8">
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-4'>
+                    <FormField label='شروع کی تاریخ' name="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} isRequired={false} />
+                    <FormField label='آخری تاریخ' name="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} isRequired={false} />
+                    <div className="flex items-end mb-6 md:mb-0">
+                        <button
+                            onClick={handleFetchAllCustomers}
+                            disabled={loading}
+                            className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-500"
+                        >
+                            <Clock size={20} className="ml-2" />
+                            {loading ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'ڈیٹا دوبارہ لوڈ کریں'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                    <div className="md:col-span-3">
+                         <FormField label='نام، اکاؤنٹ یا گاڑی سے تلاش کریں' name="searchTerm" type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} isRequired={false} placeholder='تلاش کی کلید درج کریں' />
+                    </div>
+                </div>
+            </div>
+
+            {/* Data Table */}
+            <div className="overflow-x-auto">
+                <table className="min-w-full bg-white border border-slate-300 rounded-xl shadow-lg">
+                    <thead className="bg-slate-800 text-white">
+                        <tr>
+                            <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.recordDate}</th>
+                            <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.accountNumber}</th>
+                            <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.customerName}</th>
+                            <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.vehicleName}</th>
+                            <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.remainingAuto} ({URDU_LABELS.fields.totalLoan})</th>
+                            <th className="py-3 px-4 text-center text-xl font-bold">{URDU_LABELS.fields.status}</th>
+                            <th className="py-3 px-4 text-center text-xl font-bold">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading && (
+                             <tr>
+                                <td colSpan={7} className="py-8 text-center text-2xl text-slate-500">ڈیٹا لوڈ ہو رہا ہے...</td>
+                            </tr>
+                        )}
+                        {!loading && filteredRecords.length === 0 && (
+                            <tr>
+                                <td colSpan={7} className="py-8 text-center text-2xl text-red-500">{URDU_LABELS.general.notFound}</td>
+                            </tr>
+                        )}
+                        {filteredRecords.map((record, index) => (
+                            <tr key={record.id} className={`border-b border-slate-200 hover:bg-slate-50 transition duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
+                                <td className="py-3 px-4 text-center text-lg text-slate-600 border-l">
+                                    {new Date(record.created_at).toLocaleDateString('ur-PK')}
+                                </td>
+                                <td className="py-3 px-4 text-center text-lg font-bold text-amber-700 border-l">
+                                    {record.account_number}
+                                </td>
+                                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
+                                    {record.customer_name}
+                                </td>
+                                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
+                                    {record.vehicle_name}
+                                </td>
+                                <td className="py-3 px-4 text-center text-lg font-extrabold text-red-600 border-l">
+                                    {record.remaining_loan.toLocaleString('en-US')}
+                                </td>
+                                <td className={`py-3 px-4 text-center text-lg font-bold border-l ${record.remaining_loan <= 0 ? 'text-green-600' : 'text-amber-600'}`}>
+                                    {record.remaining_loan <= 0 ? 'ادا ہو گیا' : 'جاری ہے'}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                    <button
+                                        onClick={() => handleViewDetails(record.id)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    >
+                                        {URDU_LABELS.general.viewDetails}
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 
 // =========================================================================
 //                             LOGIN SCREEN
@@ -929,6 +1321,10 @@ const App: React.FC = () => {
   const [fetchedCustomer, setFetchedCustomer] = useState<CustomerType | null>(null);
   const [balanceResult, setBalanceResult] = useState<BalanceResultType | null>(null);
   const [installmentPayDetail, setInstallmentPayDetail] = useState<InstallmentPayDetailType | null>(null);
+  
+  // NEW: All Records State
+  const [customerRecords, setCustomerRecords] = useState<CustomerRecord[]>([]);
+  const [fullDetails, setFullDetails] = useState<FullCustomerDetails | null>(null);
 
   // Utility function to show messages
   const showMessage = (text: string, type: 'success' | 'error' | '') => {
@@ -942,6 +1338,8 @@ const App: React.FC = () => {
     setFetchedCustomer(null);
     setBalanceResult(null);
     setInstallmentPayDetail(null);
+    setCustomerRecords([]); // NEW: Clear records on menu switch
+    setFullDetails(null); // NEW: Clear full details
   };
   
   // Auto-calculate remaining amount for Payment Form
@@ -1051,7 +1449,7 @@ const App: React.FC = () => {
         if (activeVehicle && activeVehicle.id && activeMenu === 'installmentPay') {
             
             type InstallmentData = { payment_date: string; paid_count: number; remaining_balance: number }[];
-            const { data: installmentData, error: _instError } = await supabase // CHANGED: error: instError -> error: _instError
+            const { data: installmentData, error: _instError } = await supabase 
                 .from('installments')
                 .select('payment_date, paid_count, remaining_balance')
                 .eq('vehicle_id', activeVehicle.id)
@@ -1141,7 +1539,6 @@ const App: React.FC = () => {
       const vehicleId = (vehicleInsert as any).id as string;
       
       // 2. ایڈوانس پیمنٹ کو پہلی قسط کے طور پر ریکارڈ کریں (Insert into 'installments' table)
-      const paidCount = advance > 0 ? 0 : 0; // Advance payment should ideally be count 0, first installment is count 1.
       
       // We insert the advance payment record first.
       if (advance > 0) {
@@ -1252,7 +1649,7 @@ const App: React.FC = () => {
     
     // Step 1: Find Customer ID if searching by Account Number
     if (searchType === 'accountNumber') {
-        const { data: customerData, error: _cError } = await supabase // CHANGED: error: cError -> error: _cError
+        const { data: customerData, error: _cError } = await supabase
             .from('customers')
             .select('id')
             .eq('account_number', searchKey)
@@ -1294,7 +1691,7 @@ const App: React.FC = () => {
     // Step 3: Fetch all installment history
     type AllInstallmentsResult = InstallmentHistory[] | null;
     
-    const { data: installmentHistoryRaw, error: _iError } = await supabase // CHANGED: error: iError -> error: _iError
+    const { data: installmentHistoryRaw, error: _iError } = await supabase 
         .from('installments')
         .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
         .eq('vehicle_id', vehicleData.id)
@@ -1308,8 +1705,8 @@ const App: React.FC = () => {
     const planLength = vehicleData.installment_plan === '12 Months' ? 12 : 24;
     
     let paidCount = latestInst?.paid_count || 0;
-    const remainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; // FIX: Changed 'let' to 'const'
-    const nextDueDate = vehicleData.next_due_date; // FIX: Changed 'let' to 'const'
+    const remainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; 
+    const nextDueDate = vehicleData.next_due_date; 
     
     // Recalculate paid count if advance payment was recorded as count 0
     if (history.length > 0) {
@@ -1342,6 +1739,118 @@ const App: React.FC = () => {
         daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
         history: history,
     });
+
+    setLoading(false);
+  };
+  
+  // NEW: All Records Fetching Logic
+  const handleFetchAllCustomers = useCallback(async () => {
+    setLoading(true);
+    setCustomerRecords([]);
+    setMessage({ text: '', type: '' });
+
+    const { data: customersData, error: cError } = await supabase
+        .from('customers')
+        .select(`
+            id, 
+            account_number, 
+            customer_name, 
+            created_at,
+            vehicles (
+                id,
+                item_name,
+                remaining_loan,
+                created_at
+            )
+        `)
+        .order('created_at', { ascending: false });
+
+    if (cError) {
+        console.error("Supabase All Customers Error:", cError);
+        showMessage(URDU_LABELS.general.error + " تمام ریکارڈز لوڈ نہیں ہو سکے۔", 'error');
+    } else if (customersData) {
+        const records: CustomerRecord[] = (customersData as any[]).map(customer => {
+            // Get the latest vehicle associated with the customer
+            const latestVehicle = customer.vehicles?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            
+            return {
+                id: customer.id,
+                account_number: customer.account_number,
+                customer_name: customer.customer_name,
+                vehicle_name: latestVehicle ? latestVehicle.item_name : 'No Vehicle',
+                remaining_loan: latestVehicle ? latestVehicle.remaining_loan : 0,
+                created_at: customer.created_at,
+            };
+        });
+        setCustomerRecords(records);
+    }
+
+    setLoading(false);
+  }, []);
+  
+  // NEW: Fetch Full Details for Printable View
+  const handleFetchFullDetails = async (customerId: string) => {
+    setLoading(true);
+    setFullDetails(null);
+    setMessage({ text: '', type: '' });
+
+    const { data: customerDataRaw, error: cError } = await supabase
+        .from('customers')
+        .select(`
+            id, account_number, customer_name, father_name, phone, cnic, address,
+            guarantor1_details, guarantor2_details,
+            vehicles (
+                id, item_name, registration_number, engine_number, chassis_number, model, color, insurance_docs,
+                total_amount, advance_payment, remaining_loan, monthly_installment, installment_plan, next_due_date, created_at
+            )
+        `)
+        .eq('id', customerId)
+        .limit(1)
+        .single();
+        
+    const customerData = customerDataRaw as (Omit<FullCustomerDetails, 'vehicle' | 'history' | 'totalPaidCount' | 'remainingCount' | 'totalPaidAmount' | 'totalInstallmentAmount' | 'planLength'> & { vehicles: (VehicleSummary & { engine_number: string; chassis_number: string; model: string; color: string; insurance_docs: string; })[] | null }) | null;
+
+    if (cError || !customerData) {
+        console.error("Supabase Full Details Error:", cError);
+        showMessage(URDU_LABELS.general.notFound, 'error');
+        setLoading(false);
+        return;
+    }
+
+    const latestVehicle = customerData.vehicles?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+    if (!latestVehicle) {
+        showMessage("گاڑی کا ریکارڈ نہیں ملا۔", 'error');
+        setLoading(false);
+        return;
+    }
+
+    // Fetch Installment History
+    type AllInstallmentsResult = InstallmentHistory[] | null;
+    const { data: installmentHistoryRaw, error: iError } = await supabase
+        .from('installments')
+        .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
+        .eq('vehicle_id', latestVehicle.id)
+        .order('payment_date', { ascending: true });
+        
+    const history = (installmentHistoryRaw as AllInstallmentsResult) || [];
+    
+    // Calculations for summary
+    const planLength = latestVehicle.installment_plan === '12 Months' ? 12 : 24;
+    const totalPaidAmount = history.reduce((sum, rec) => sum + rec.amount_paid, 0);
+    const totalPaidCount = history.filter(h => h.paid_count > 0).length;
+    const totalInstallmentAmount = latestVehicle.monthly_installment * planLength;
+    
+    setFullDetails({
+        ...customerData,
+        vehicle: latestVehicle,
+        history: history,
+        totalPaidCount: totalPaidCount,
+        remainingCount: planLength - totalPaidCount,
+        totalPaidAmount: totalPaidAmount,
+        totalInstallmentAmount: totalInstallmentAmount,
+        planLength: planLength,
+    } as FullCustomerDetails); // Type assertion is safe here
 
     setLoading(false);
   };
@@ -1385,6 +1894,13 @@ const App: React.FC = () => {
                     loading={loading}
                     balanceResult={balanceResult}
                 />;
+      case 'allRecords': // NEW: All Records Case
+        return <RenderAllRecords
+                    customerRecords={customerRecords}
+                    loading={loading}
+                    handleFetchAllCustomers={handleFetchAllCustomers}
+                    handleViewDetails={handleFetchFullDetails}
+                />;
       default:
         return <RenderRegisterUser 
                     formState={registerForm} 
@@ -1399,6 +1915,12 @@ const App: React.FC = () => {
   if (!isAuthenticated) {
       return (
           <LoginScreen handleLogin={handleLogin} message={message} />
+      );
+  }
+  
+  if (fullDetails) {
+      return (
+          <PrintableDetailsView details={fullDetails} onClose={() => setFullDetails(null)} />
       );
   }
 
