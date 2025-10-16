@@ -34,13 +34,18 @@ interface CustomerType {
 
 // New type for All Records Table
 interface CustomerRecord {
-  id: string;
-  account_number: string;
-  customer_name: string;
-  vehicle_name: string;
-  remaining_loan: number;
-  created_at: string;
+    id: string;
+    account_number: string;
+    customer_name: string;
+    vehicle_name: string;
+    remaining_loan: number;
+    total_paid?: number;
+    paid_count?: number;
+    remaining_count?: number;
+    monthly_installment?: number;
+    created_at: string;
 }
+
 
 // New type for Full Details View
 interface FullCustomerDetails {
@@ -95,7 +100,8 @@ interface BalanceResultType {
     vehicle: string;
     // Summary fields
     totalAmount: number; // *UPDATED: Added total amount*
-    totalAdvance: number; 
+    totalAdvance: number;
+      totalPaid?: number; 
     remainingLoan: number; 
     // Next payment details
     installmentAmount: number;
@@ -143,7 +149,7 @@ const URDU_LABELS = {
   tagline: "قسطوں پر گاڑیوں کے لین دین کا نظام",
   menu: {
     register: "Add Customer",
-    payment: "Payment",
+    payment: "Add Item &  Payment",
     installmentPay: "Installment Pay",
     checkBalance: "Check Balance",
     allRecords: "All Record", 
@@ -219,6 +225,7 @@ interface FormFieldProps {
   value: string | number | null;
   onChange: FormChangeHandler;
   placeholder?: string;
+  min?: string | number;
   isRequired?: boolean;
   isTextArea?: boolean;
   isReadonly?: boolean;
@@ -356,7 +363,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, setIsSidebarOpen, acti
             </div>
             <nav className="space-y-4 pt-10 lg:pt-0">
                 <MenuButton icon={UserPlus} label={URDU_LABELS.menu.register} menuKey="register" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
-                <MenuButton icon={DollarSign} label={URDU_LABELS.menu.payment} menuKey="payment" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
                 <MenuButton icon={FileText} label={URDU_LABELS.menu.installmentPay} menuKey="installmentPay" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
                 <MenuButton icon={Search} label={URDU_LABELS.menu.checkBalance} menuKey="checkBalance" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
                 {/* NEW: All Records Button */}
@@ -389,9 +395,11 @@ interface RenderRegisterUserProps {
     setFormState: React.Dispatch<React.SetStateAction<RegisterFormState>>;
     handleSubmit: (e: React.FormEvent) => Promise<void>;
     loading: boolean;
+    handlePaymentClick: () => void; // ✅ Add this
+
 }
 
-const RenderRegisterUser: React.FC<RenderRegisterUserProps> = ({ formState, setFormState, handleSubmit, loading }) => {
+const RenderRegisterUser: React.FC<RenderRegisterUserProps> = ({ formState, setFormState, handleSubmit, loading, handlePaymentClick }) => {
     const handleChange: FormChangeHandler = (e) => {
       setFormState({ ...formState, [e.target.name]: e.target.value });
     };
@@ -421,12 +429,22 @@ const RenderRegisterUser: React.FC<RenderRegisterUserProps> = ({ formState, setF
           {/* Guarantor 2 */}
           <GuarantorFields number={2} formState={formState} handleChange={handleChange} />
 
+          {/* Save Button */}
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-2xl p-4 rounded-xl transition duration-300 shadow-lg mt-4 disabled:bg-slate-500"
           >
             {loading ? 'محفوظ ہو رہا ہے...' : URDU_LABELS.general.save}
+          </button>
+
+          {/* Payment Button below Save */}
+          <button
+            type="button"
+            onClick={handlePaymentClick} // Sidebar کے payment button جیسا action
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold text-2xl p-4 rounded-xl transition duration-300 shadow-lg mt-2"
+          >
+            {URDU_LABELS.menu.payment} 💰
           </button>
         </form>
       </div>
@@ -443,13 +461,16 @@ interface RenderPaymentProps {
 }
 
 const RenderPayment: React.FC<RenderPaymentProps> = ({ formState, setFormState, handleSubmit, handleSearchWrapper, loading, fetchedCustomer }) => {
-    const handleChange: FormChangeHandler = (e) => {
-      let value: string | number = e.target.value;
-      if (e.target.name === 'totalAmount' || e.target.name === 'advance') {
-        value = parseFloat(value as string) || 0;
-      }
-      setFormState({ ...formState, [e.target.name]: value as any });
-    };
+  const handleChange: FormChangeHandler = (e) => {
+    let value: string | number = e.target.value;
+
+    if (e.target.name === 'totalAmount' || e.target.name === 'advance') {
+      value = e.target.value === '' ? '' : parseFloat(e.target.value);
+    }
+
+    setFormState({ ...formState, [e.target.name]: value as any });
+  };
+
 
     return (
       <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto" dir="rtl">
@@ -490,8 +511,8 @@ const RenderPayment: React.FC<RenderPaymentProps> = ({ formState, setFormState, 
           <h3 className="text-3xl font-extrabold text-slate-700 mb-6">مالی تفصیلات</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
             <FormField label={URDU_LABELS.fields.date} name="date" type="date" value={formState.date} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.totalAmount} name="totalAmount" type="number" value={formState.totalAmount} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.advance} name="advance" type="number" value={formState.advance} onChange={handleChange} />
+            <FormField label={URDU_LABELS.fields.totalAmount} name="totalAmount" type="number" value={formState.totalAmount === 0 ? '' : formState.totalAmount} onChange={handleChange} />
+            <FormField label={URDU_LABELS.fields.advance} name="advance" type="number" value={formState.advance === 0 ? '' : formState.advance} onChange={handleChange} />
             <FormField label={URDU_LABELS.fields.monthlyInstallment} name="monthlyInstallment" type="text" value={formState.monthlyInstallment.toLocaleString('en-US')} isReadonly isRequired={false} onChange={handleChange} />
             <FormField label={URDU_LABELS.fields.remainingAuto} name="remainingAuto" type="text" value={formState.remainingAuto.toLocaleString('en-US')} isReadonly isRequired={false} onChange={handleChange} />
             
@@ -560,12 +581,15 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
 
     const isLoanCompleted = payDetail && payDetail.remaining_loan <= 0;
 
+
     return (
       <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto" dir="rtl">
         <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
           Installment Pay
         </h2>
-        
+                  
+            
+
         <form onSubmit={(e) => { e.preventDefault(); handleSearchWrapper(); }}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border border-slate-200 rounded-xl bg-slate-50">
             <div className="md:col-span-2">
@@ -612,18 +636,22 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
               <p className='font-bold text-green-900'>{URDU_LABELS.fields.monthlyInstallment} (مقررہ): <span className='font-normal mr-2'>{payDetail.monthly_installment.toLocaleString('en-US')}</span></p>
               <p className='font-bold text-green-900'>{URDU_LABELS.general.paid}: <span className='font-normal mr-2'>{payDetail.paid_count}</span></p>
               <p className='font-bold text-green-900'>{URDU_LABELS.general.bakaya}: <span className='font-normal mr-2 text-red-700 font-extrabold'>{payDetail.remaining_loan.toLocaleString('en-US')}</span></p>
+
             </div>
             
+
             <form onSubmit={handleSubmit} className="mt-8 pt-4 border-t-2 border-green-300">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6">
                 <FormField
-                  label={URDU_LABELS.fields.installmentAmount}
-                  name="installmentAmount"
-                  type="number"
-                  value={searchForm.installmentAmount}
-                  onChange={handleChange}
-                  placeholder="قسط کی رقم درج کریں"
-                />
+                label={URDU_LABELS.fields.installmentAmount}
+                name="installmentAmount"
+                type="number"
+                min="1" // negative ya zero input block karega
+                value={searchForm.installmentAmount || ''}
+                onChange={handleChange}
+                placeholder="قسط کی رقم درج کریں"
+              />
+
                 <FormField
                   label={URDU_LABELS.fields.paymentDate}
                   name="paymentDate"
@@ -631,6 +659,7 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
                   value={searchForm.paymentDate}
                   onChange={handleChange}
                 />
+                
                 <div className="flex items-end mb-6">
                    <button
                     type="submit"
@@ -1056,145 +1085,235 @@ const PrintableDetailsView: React.FC<PrintableDetailsViewProps> = ({ details, on
 };
 
 // =========================================================================
-//                  NEW COMPONENT: RenderAllRecords (Table View)
+//                  UPDATED COMPONENT: RenderAllRecords (with Delete)
 // =========================================================================
 
 interface RenderAllRecordsProps {
-    customerRecords: CustomerRecord[];
-    loading: boolean;
-    handleFetchAllCustomers: () => Promise<void>;
-    handleViewDetails: (customerId: string) => Promise<void>;
+  customerRecords: CustomerRecord[];
+  loading: boolean;
+  handleFetchAllCustomers: () => Promise<void>;
+  handleViewDetails: (customerId: string) => Promise<void>;
 }
+const showMessage = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
+  alert(`${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${text}`);
+};
 
-const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({ customerRecords, loading, handleFetchAllCustomers, handleViewDetails }) => {
-    
-    // Simple state for date range filtering
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
+const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
+  customerRecords,
+  loading,
+  handleFetchAllCustomers,
+  handleViewDetails,
+}) => {
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null); // Track deleting record
 
-    const filteredRecords = useMemo(() => {
-        let records = customerRecords;
+  // ✅ DELETE FUNCTION
+  const handleDeleteRecord = async (customerId: string) => {
+    const confirmDelete = window.confirm("کیا آپ واقعی اس ریکارڈ کو حذف کرنا چاہتے ہیں؟");
+    if (!confirmDelete) return;
 
-        // Date Filtering
-        if (startDate && endDate) {
-            records = records.filter(record => {
-                const recordDate = new Date(record.created_at);
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                // Set end time to end of day for inclusive filtering
-                end.setHours(23, 59, 59, 999);
-                return recordDate >= start && recordDate <= end;
-            });
-        }
+    try {
+      setDeleting(customerId);
 
-        // Search Filtering (Case-insensitive on Name, Account Number, Vehicle Name)
-        if (searchTerm) {
-            const lowerSearchTerm = searchTerm.toLowerCase();
-            records = records.filter(record => 
-                record.customer_name.toLowerCase().includes(lowerSearchTerm) ||
-                record.account_number.toLowerCase().includes(lowerSearchTerm) ||
-                record.vehicle_name.toLowerCase().includes(lowerSearchTerm)
-            );
-        }
+      // 1️⃣ Delete related installments first (to avoid foreign key conflict)
+      await supabase.from("installments").delete().eq("customer_id", customerId);
 
-        return records;
-    }, [customerRecords, startDate, endDate, searchTerm]);
+      // 2️⃣ Delete related vehicles
+      await supabase.from("vehicles").delete().eq("customer_id", customerId);
 
-    useEffect(() => {
-        handleFetchAllCustomers();
-    }, [handleFetchAllCustomers]);
+      // 3️⃣ Delete main customer record
+      const { error } = await supabase.from("customers").delete().eq("id", customerId);
+      if (error) throw error;
 
-    return (
-        <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-7xl mx-auto" dir="rtl">
-            <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
-                {URDU_LABELS.general.allRecords}
-            </h2>
+      // 4️⃣ Update local state instantly
+      showMessage("ریکارڈ کامیابی سے حذف ہو گیا ✅", "success");
+      await handleFetchAllCustomers(); // refresh records
+    } catch (error: any) {
+      console.error("Delete Error:", error);
+      showMessage("ریکارڈ حذف نہیں ہو سکا ❌", "error");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
-            {/* Controls and Filters */}
-            <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 mb-8">
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-4'>
-                    <FormField label='شروع کی تاریخ' name="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} isRequired={false} />
-                    <FormField label='آخری تاریخ' name="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} isRequired={false} />
-                    <div className="flex items-end mb-6 md:mb-0">
-                        <button
-                            onClick={handleFetchAllCustomers}
-                            disabled={loading}
-                            className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-500"
-                        >
-                            <Clock size={20} className="ml-2" />
-                            {loading ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'ڈیٹا دوبارہ لوڈ کریں'}
-                        </button>
-                    </div>
-                </div>
+  // ✅ Filter logic
+  const filteredRecords = useMemo(() => {
+    let records = customerRecords;
 
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                    <div className="md:col-span-3">
-                         <FormField label='نام، اکاؤنٹ یا گاڑی سے تلاش کریں' name="searchTerm" type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} isRequired={false} placeholder='تلاش کی کلید درج کریں' />
-                    </div>
-                </div>
-            </div>
+    if (startDate && endDate) {
+      records = records.filter((record) => {
+        const recordDate = new Date(record.created_at);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        return recordDate >= start && recordDate <= end;
+      });
+    }
 
-            {/* Data Table */}
-            <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-slate-300 rounded-xl shadow-lg">
-                    <thead className="bg-slate-800 text-white">
-                        <tr>
-                            <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.recordDate}</th>
-                            <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.accountNumber}</th>
-                            <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.customerName}</th>
-                            <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.vehicleName}</th>
-                            <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">{URDU_LABELS.fields.remainingAuto} ({URDU_LABELS.fields.totalLoan})</th>
-                            <th className="py-3 px-4 text-center text-xl font-bold">{URDU_LABELS.fields.status}</th>
-                            <th className="py-3 px-4 text-center text-xl font-bold">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading && (
-                             <tr>
-                                <td colSpan={7} className="py-8 text-center text-2xl text-slate-500">ڈیٹا لوڈ ہو رہا ہے...</td>
-                            </tr>
-                        )}
-                        {!loading && filteredRecords.length === 0 && (
-                            <tr>
-                                <td colSpan={7} className="py-8 text-center text-2xl text-red-500">{URDU_LABELS.general.notFound}</td>
-                            </tr>
-                        )}
-                        {filteredRecords.map((record, index) => (
-                            <tr key={record.id} className={`border-b border-slate-200 hover:bg-slate-50 transition duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
-                                <td className="py-3 px-4 text-center text-lg text-slate-600 border-l">
-                                    {new Date(record.created_at).toLocaleDateString('ur-PK')}
-                                </td>
-                                <td className="py-3 px-4 text-center text-lg font-bold text-amber-700 border-l">
-                                    {record.account_number}
-                                </td>
-                                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
-                                    {record.customer_name}
-                                </td>
-                                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
-                                    {record.vehicle_name}
-                                </td>
-                                <td className="py-3 px-4 text-center text-lg font-extrabold text-red-600 border-l">
-                                    {record.remaining_loan.toLocaleString('en-US')}
-                                </td>
-                                <td className={`py-3 px-4 text-center text-lg font-bold border-l ${record.remaining_loan <= 0 ? 'text-green-600' : 'text-amber-600'}`}>
-                                    {record.remaining_loan <= 0 ? 'ادا ہو گیا' : 'جاری ہے'}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                    <button
-                                        onClick={() => handleViewDetails(record.id)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200"
-                                    >
-                                        {URDU_LABELS.general.viewDetails}
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      records = records.filter(
+        (record) =>
+          record.customer_name.toLowerCase().includes(lowerSearchTerm) ||
+          record.account_number.toLowerCase().includes(lowerSearchTerm) ||
+          record.vehicle_name.toLowerCase().includes(lowerSearchTerm)
+      );
+    }
+
+    return records;
+  }, [customerRecords, startDate, endDate, searchTerm]);
+
+  useEffect(() => {
+    handleFetchAllCustomers();
+  }, [handleFetchAllCustomers]);
+
+  return (
+    <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-7xl mx-auto" dir="rtl">
+      <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
+        {URDU_LABELS.general.allRecords}
+      </h2>
+
+      {/* Controls */}
+      <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <FormField
+            label="شروع کی تاریخ"
+            name="startDate"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+          <FormField
+            label="آخری تاریخ"
+            name="endDate"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+          <div className="flex items-end mb-6 md:mb-0">
+            <button
+              onClick={handleFetchAllCustomers}
+              disabled={loading}
+              className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-500"
+            >
+              <Clock size={20} className="ml-2" />
+              {loading ? "ڈیٹا لوڈ ہو رہا ہے..." : "ڈیٹا دوبارہ لوڈ کریں"}
+            </button>
+          </div>
         </div>
-    );
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-3">
+            <FormField
+              label="نام، اکاؤنٹ یا گاڑی سے تلاش کریں"
+              name="searchTerm"
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="تلاش کی کلید درج کریں"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border border-slate-300 rounded-xl shadow-lg">
+          <thead className="bg-slate-800 text-white">
+            <tr>
+              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
+                {URDU_LABELS.fields.recordDate}
+              </th>
+              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
+                {URDU_LABELS.fields.accountNumber}
+              </th>
+              <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">
+                {URDU_LABELS.fields.customerName}
+              </th>
+              <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">
+                {URDU_LABELS.fields.vehicleName}
+              </th>
+              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
+                {URDU_LABELS.fields.remainingAuto} ({URDU_LABELS.fields.totalLoan})
+              </th>
+              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
+                {URDU_LABELS.fields.status}
+              </th>
+              <th className="py-3 px-4 text-center text-xl font-bold">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-2xl text-slate-500">
+                  ڈیٹا لوڈ ہو رہا ہے...
+                </td>
+              </tr>
+            )}
+
+            {!loading && filteredRecords.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-2xl text-red-500">
+                  {URDU_LABELS.general.notFound}
+                </td>
+              </tr>
+            )}
+
+            {filteredRecords.map((record, index) => (
+              <tr
+                key={record.id}
+                className={`border-b border-slate-200 hover:bg-slate-50 transition duration-150 ${
+                  index % 2 === 0 ? "bg-white" : "bg-slate-100"
+                }`}
+              >
+                <td className="py-3 px-4 text-center text-lg text-slate-600 border-l">
+                  {new Date(record.created_at).toLocaleDateString("ur-PK")}
+                </td>
+                <td className="py-3 px-4 text-center text-lg font-bold text-amber-700 border-l">
+                  {record.account_number}
+                </td>
+                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
+                  {record.customer_name}
+                </td>
+                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
+                  {record.vehicle_name}
+                </td>
+                <td className="py-3 px-4 text-center text-lg font-extrabold text-red-600 border-l">
+                  {record.remaining_loan.toLocaleString("en-US")}
+                </td>
+                <td
+                  className={`py-3 px-4 text-center text-lg font-bold border-l ${
+                    record.remaining_loan <= 0 ? "text-green-600" : "text-amber-600"
+                  }`}
+                >
+                  {record.remaining_loan <= 0 ? "ادا ہو گیا" : "جاری ہے"}
+                </td>
+                <td className="py-3 px-4 text-center flex gap-2 justify-center">
+                  <button
+                    onClick={() => handleViewDetails(record.id)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200"
+                  >
+                    {URDU_LABELS.general.viewDetails}
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteRecord(record.id)}
+                    disabled={deleting === record.id}
+                    className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200 disabled:bg-red-400"
+                  >
+                    {deleting === record.id ? "حذف ہو رہا ہے..." : "Delete"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };
 
 
@@ -1526,6 +1645,10 @@ const App: React.FC = () => {
           handleSearchCustomer(installmentPayForm.accountNumber);
       }
   };
+  
+ 
+
+  
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -1613,241 +1736,257 @@ const App: React.FC = () => {
       setLoading(false);
   };
   
-  const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage({ text: '', type: '' });
-    
+const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setMessage({ text: '', type: '' });
+
+  try {
     if (!installmentPayDetail) {
-        showMessage("پہلے اکاؤنٹ نمبر تلاش کریں!", 'error');
-        setLoading(false);
-        return;
+      showMessage("پہلے اکاؤنٹ نمبر تلاش کریں!", 'error');
+      setLoading(false);
+      return;
     }
-    
+
     const { installmentAmount, paymentDate } = installmentPayForm;
-    const { vehicle_id, remaining_loan, monthly_installment, paid_count, next_due_date, plan } = installmentPayDetail;
-    
-    const amount = installmentAmount;
-    
-    // 1. Calculate New Remaining Balance (Deducting full amount)
-    let remaining = remaining_loan - amount;
-    // Ensure remaining is not negative, set to 0 if overpaid
-    const actualRemaining = Math.max(0, remaining);
-    
-    // 2. Calculate next paid count and due date
-    const planLength = plan === '12 Months' ? 12 : 24;
-    
-    let newPaidCount = paid_count;
-    let newDueDate = next_due_date; // Keep old due date for now
-    let installmentsCovered = 0;
-    
-    // Logic for advancing paid count and due date
-    if (amount >= monthly_installment) {
-        // Calculate how many installments the amount paid *exceeds* the remaining balance
-        // We only advance the paid count based on monthly installments covered.
-        installmentsCovered = Math.floor(amount / monthly_installment);
-        
-        // Only increment up to the plan length
-        newPaidCount = Math.min(planLength, paid_count + installmentsCovered);
-        
-        // Advance the due date by the number of months covered
-        if (next_due_date) {
-            const nextDueDateObj = new Date(next_due_date);
-            newDueDate = new Date(nextDueDateObj.setMonth(nextDueDateObj.getMonth() + installmentsCovered)).toISOString().substring(0, 10);
-        }
-    } else {
-        // If payment is less than the installment, only update balance, not paid count or next due date.
+    const {
+      vehicle_id,
+      remaining_loan,
+      monthly_installment,
+      paid_count,
+      next_due_date,
+      plan,
+    } = installmentPayDetail;
+
+    const amount = Number(installmentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      showMessage("ادائیگی کی رقم درست نہیں ہے۔", "error");
+      setLoading(false);
+      return;
     }
-    
-    // If remaining loan is cleared, paid count should be set to the total plan length
-    if (actualRemaining === 0) {
-        newPaidCount = planLength;
-        newDueDate = null; // Loan is complete
+
+    // --- Plan Length ---
+    const planLength = plan === "12 Months" ? 12 : 24;
+
+    // --- Remaining Calculation ---
+    let newRemaining = remaining_loan - amount;
+    let overpay = 0;
+    if (newRemaining < 0) {
+      overpay = Math.abs(newRemaining);
+      newRemaining = 0;
     }
-    
-    // 1. قسط کا ریکارڈ محفوظ کریں (Insert into 'installments' table)
+
+    // --- Paid Count Calculation ---
+    const installmentsCovered = Math.floor(amount / monthly_installment);
+    let newPaidCount = Math.min(planLength, paid_count + installmentsCovered);
+
+    // --- Due Date Calculation ---
+    let newDueDate = next_due_date;
+    if (next_due_date && newRemaining > 0) {
+      const nextDate = new Date(next_due_date);
+      nextDate.setMonth(nextDate.getMonth() + installmentsCovered);
+      newDueDate = nextDate.toISOString().substring(0, 10);
+    } else if (newRemaining === 0) {
+      newDueDate = null; // loan complete
+      newPaidCount = planLength;
+    }
+
+    // --- Insert Record ---
     const installmentRecord = {
-        vehicle_id: vehicle_id,
-        payment_date: paymentDate,
-        amount_paid: amount,
-        paid_count: newPaidCount, 
-        remaining_balance: actualRemaining,
+      vehicle_id,
+      payment_date: paymentDate,
+      amount_paid: amount,
+      paid_count: newPaidCount,
+      remaining_balance: newRemaining,
     };
-    
+
     const { error: installmentError } = await supabase
-        .from('installments')
-        .insert([installmentRecord]);
+      .from("installments")
+      .insert([installmentRecord]);
         
-    if (installmentError) {
-        console.error("Supabase Installment Payment Error:", installmentError);
-        showMessage(URDU_LABELS.general.error + " قسط محفوظ نہیں ہو سکی۔", 'error');
-        setLoading(false);
-        return;
+     if (installmentError) {
+      console.error("Supabase Installment Payment Error:", installmentError);
+      showMessage("ادائیگی محفوظ نہیں ہو سکی۔", "error");
+      } else {
+        showMessage(URDU_LABELS.general.success + " ادائیگی محفوظ  ہو سکی۔!", 'success');
+     setLoading(false);
+      return;
     }
-    
-    // 2. Vehicle کے ریکارڈ کو اپ ڈیٹ کریں (Update 'vehicles' table)
-    const vehicleUpdateData: { remaining_loan: number; next_due_date: string | null } = {
-        remaining_loan: actualRemaining,
-        next_due_date: newDueDate,
-    };
 
+    // --- Update Vehicle Loan ---
     const { error: vehicleUpdateError } = await supabase
-        .from('vehicles')
-        .update(vehicleUpdateData)
-        .eq('id', vehicle_id);
-        
-    if (vehicleUpdateError) {
-        console.error("Supabase Vehicle Update Error:", vehicleUpdateError);
-        showMessage(URDU_LABELS.general.error + " گاڑی کا ریکارڈ اپ ڈیٹ نہیں ہو سکا۔", 'error');
-    } else {
-        if (actualRemaining === 0) {
-            showMessage(URDU_LABELS.general.success + " مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!", 'success');
-        } else {
-            showMessage(URDU_LABELS.general.success + " قسط کی ادائیگی محفوظ ہو گئی!", 'success');
-        }
-        
-        // Re-fetch customer data to update UI (payDetail)
-        handleSearchCustomer(installmentPayForm.accountNumber); 
-        setInstallmentPayForm(prev => ({ ...prev, installmentAmount: 0 }));
-    }
-    
-    setLoading(false);
-  };
+      .from("vehicles")
+      .update({
+        remaining_loan: newRemaining,
+        next_due_date: newDueDate,
+      })
+      .eq("id", vehicle_id);
 
-  const handleCheckBalance = async () => {
+    if (vehicleUpdateError) {
+      console.error("Supabase Vehicle Update Error:", vehicleUpdateError);
+      showMessage("گاڑی کا ریکارڈ اپ ڈیٹ نہیں ہو سکا۔", "error");
+      setLoading(false);
+      return;
+    }
+
+
+
+    // --- Re-Fetch Updated Customer Detail ---
+    await handleSearchCustomer(installmentPayForm.accountNumber);
+
+    // --- Reset Form ---
+    setInstallmentPayForm((prev) => ({ ...prev, installmentAmount: 0 }));
+
+  } catch (err) {
+    console.error("Payment Submit Error:", err);
+    showMessage("کچھ غلطی ہو گئی، دوبارہ کوشش کریں۔", "error");
+  }
+
+  setLoading(false);
+};
+
+
+const handleCheckBalance = async () => {
+  try {
     setLoading(true);
     setBalanceResult(null);
     setMessage({ text: '', type: '' });
-    
+
     const { searchKey, searchType } = checkBalanceForm;
-    
     let customerId: string | null = null;
-    
-    // Step 1: Find Customer ID if searching by Account Number
-    if (searchType === 'accountNumber') {
-        const { data: customerData, error: _cError } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('account_number', searchKey)
-            .limit(1)
-            .single();
-            
-        if (_cError || !customerData) {
-            showMessage(URDU_LABELS.general.notFound, 'error');
-            setLoading(false);
-            return;
-        }
-        customerId = customerData.id;
-    }
-    
-    // Step 2: Find Vehicle Data
-    let query = supabase
-        .from('vehicles')
-        .select(`*, customer:customer_id(customer_name)`)
-        .order('created_at', { ascending: false }) 
-        .limit(1);
 
-    if (customerId) {
-        query = query.eq('customer_id', customerId);
-    } else {
-        query = query.eq('registration_number', searchKey);
-    }
-    
-    type VehicleDataResult = (VehicleSummary & { customer: { customer_name: string } }) | null;
-    
-    const { data: vehicleDataRaw, error: vError } = await query.single();
-    const vehicleData = vehicleDataRaw as VehicleDataResult;
+    if (searchType === "accountNumber") {
+      const { data: customerData, error: _cError } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("account_number", searchKey)
+        .single();
 
-    if (vError || !vehicleData || !vehicleData.customer) {
-        showMessage(URDU_LABELS.general.notFound, 'error');
+      if (_cError || !customerData) {
+        showMessage(URDU_LABELS.general.notFound, "error");
         setLoading(false);
         return;
-    }
-    
-    // Step 3: Fetch all installment history
-    type AllInstallmentsResult = InstallmentHistory[] | null;
-    
-    const { data: installmentHistoryRaw, error: _iError } = await supabase 
-        .from('installments')
-        .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
-        .eq('vehicle_id', vehicleData.id)
-        .order('payment_date', { ascending: true }); // Order by date for the history list
-    
-    const history = (installmentHistoryRaw as AllInstallmentsResult) || [];
-    
-    // Step 4: Determine current status (using the latest record for balance and count)
-    const latestInst = history.sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
-    
-    const planLength = vehicleData.installment_plan === '12 Months' ? 12 : 24;
-    
-    // Use the latest installment balance, or fall back to the vehicle's remaining loan (which should be the same)
-    const remainingLoan = latestInst?.remaining_balance || vehicleData.remaining_loan; 
-    const nextDueDate = vehicleData.next_due_date; 
-    
-    // Calculate paid count based on records where paid_count > 0 (monthly installments)
-    const paidCount = history.filter(h => h.paid_count > 0).length;
+      }
 
-    const remainingCount = planLength - paidCount;
-    
-    // Check if the loan is fully paid (crucial for completion logic)
-    const isCompleted = remainingLoan <= 0;
-    
-    let isOverdue = false;
+      customerId = customerData.id;
+    }
+
+    let query = supabase
+      .from("vehicles")
+      .select(`*, customer:customer_id(customer_name)`)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (customerId) query = query.eq("customer_id", customerId);
+    else query = query.eq("registration_number", searchKey);
+
+    const { data: vehicleDataRaw, error: vError } = await query.single();
+    const vehicleData = vehicleDataRaw as (VehicleSummary & { customer: { customer_name: string } }) | null;
+
+    if (vError || !vehicleData || !vehicleData.customer) {
+      showMessage(URDU_LABELS.general.notFound, "error");
+      setLoading(false);
+      return;
+    }
+
+    const { data: installmentHistoryRaw, error: _iError } = await supabase
+      .from("installments")
+      .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
+      .eq("vehicle_id", vehicleData.id)
+      .order("payment_date", { ascending: true });
+
+    if (_iError) {
+      showMessage("قسط کی تفصیل حاصل کرنے میں مسئلہ ہوا۔", "error");
+      setLoading(false);
+      return;
+    }
+
+    const history: InstallmentHistory[] = installmentHistoryRaw || [];
+
+    const {
+      remainingLoan,
+      totalPaidAmount,
+      totalPaidCount,
+      remainingCount,
+      planLength,
+    } = calculateRemainingBalanceAndCounts(
+      Number(vehicleData.total_amount),
+      Number(vehicleData.advance_payment),
+      vehicleData.installment_plan,
+      history
+    );
+
+    // Safe date handling (avoid new Date(null) TypeScript error)
     let daysOverdue = 0;
+    let isOverdue = false;
+    const nextDueDate = vehicleData.next_due_date; // string | null
 
-    if (!isCompleted && nextDueDate) {
-        const today = new Date();
-        const nextDueDateObj = new Date(nextDueDate);
-        
-        today.setHours(0, 0, 0, 0);
-        nextDueDateObj.setHours(0, 0, 0, 0);
-        
-        daysOverdue = Math.floor((today.getTime() - nextDueDateObj.getTime()) / (1000 * 60 * 60 * 24));
-        
-        isOverdue = daysOverdue > 0;
+    if (nextDueDate && remainingLoan > 0) {
+      const today = new Date();
+      const nextDueDateObj = new Date(nextDueDate);
+      today.setHours(0, 0, 0, 0);
+      nextDueDateObj.setHours(0, 0, 0, 0);
+
+      daysOverdue = Math.floor((today.getTime() - nextDueDateObj.getTime()) / (1000 * 60 * 60 * 24));
+      isOverdue = daysOverdue > 0;
+    } else {
+      daysOverdue = 0;
+      isOverdue = false;
     }
-    
+
+    const isCompleted = remainingLoan <= 0;
+
     setBalanceResult({
-        name: vehicleData.customer.customer_name,
-        vehicle: vehicleData.item_name,
-        totalAmount: vehicleData.total_amount, // *UPDATED: Set total amount*
-        totalAdvance: vehicleData.advance_payment,
-        remainingLoan: remainingLoan,
-        installmentAmount: vehicleData.monthly_installment,
-        nextDueDate: nextDueDate,
-        paidCount: paidCount,
-        // Set remainingCount to 0 if completed
-        remainingCount: isCompleted ? 0 : (remainingCount < 0 ? 0 : remainingCount), 
-        isOverdue: isOverdue && !isCompleted,
-        daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
-        isCompleted: isCompleted, // NEW: Completion flag
-        history: history,
+      name: vehicleData.customer.customer_name,
+      vehicle: vehicleData.item_name,
+      totalAmount: vehicleData.total_amount,
+      totalAdvance: vehicleData.advance_payment,
+      totalPaid: totalPaidAmount, // <-- ensure BalanceResultType includes this property
+      remainingLoan,
+      installmentAmount: vehicleData.monthly_installment,
+      nextDueDate,
+      paidCount: totalPaidCount,
+      remainingCount: isCompleted ? 0 : remainingCount,
+      isOverdue: isOverdue && !isCompleted,
+      daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
+      isCompleted,
+      history,
     });
 
     setLoading(false);
-  };
-  // NEW: All Records Fetching Logic
-// 🔧 Helper Function — Balance Calculation Logic
+  } catch (err) {
+    console.error(err);
+    showMessage("کچھ غلط ہو گیا، دوبارہ کوشش کریں۔", "error");
+    setLoading(false);
+  }
+};
+
+
+// ✅ Helper — Accurate Remaining Loan Calculator
 function calculateRemainingBalanceAndCounts(
-    totalAmount: number,
-    advancePayment: number,
-    installmentPlan: string,
-    historyList: InstallmentHistory[]
+  totalAmount: number,
+  advancePayment: number,
+  installmentPlan: string,
+  historyList: InstallmentHistory[]
 ) {
-    const planLength = installmentPlan === '12 Months' ? 12 : 24;
+  const planLength =
+    installmentPlan?.includes("12") ? 12 : installmentPlan?.includes("24") ? 24 : 0;
 
-    const totalPaidAmount = historyList.reduce((sum, rec) => sum + (rec.amount_paid || 0), 0);
-    const remainingLoan = Math.max(totalAmount - advancePayment - totalPaidAmount, 0);
-    const totalPaidCount = historyList.filter(h => h.paid_count > 0).length;
-    const remainingCount = Math.max(planLength - totalPaidCount, 0);
+  const totalPaidAmount = historyList.reduce(
+    (sum, rec) => sum + (Number(rec.amount_paid) || 0),
+    0
+  );
 
-    return {
-        remainingLoan,
-        totalPaidAmount,
-        totalPaidCount,
-        remainingCount,
-        planLength
-    };
+  // 💡 Remaining loan = total - advance - all installments paid
+  const remainingLoan = Math.max(totalAmount - totalPaidAmount, 0);
+
+  const totalPaidCount = historyList.filter(
+    (h) => Number(h.amount_paid) > 0
+  ).length;
+
+  const remainingCount = Math.max(planLength - totalPaidCount, 0);
+
+  return { remainingLoan, totalPaidAmount, totalPaidCount, remainingCount, planLength };
 }
 
 // ✅ Fixed Function — Fetch All Records with Correct Remaining Balance
@@ -1857,9 +1996,9 @@ const handleFetchAllCustomers = useCallback(async () => {
     setMessage({ text: '', type: '' });
 
     try {
-        // 1️⃣ Fetch all customers with their latest vehicle
+        // 1️⃣ Fetch all customers with their vehicles
         const { data: customersData, error: cError } = await supabase
-            .from('customers')
+            .from("customers")
             .select(`
                 id, 
                 account_number, 
@@ -1872,56 +2011,73 @@ const handleFetchAllCustomers = useCallback(async () => {
                     advance_payment,
                     installment_plan,
                     remaining_loan,
+                    monthly_installment,
                     created_at
                 )
             `)
-            .order('created_at', { ascending: false });
+            .order("created_at", { ascending: false });
 
         if (cError) throw cError;
 
-        // 2️⃣ Process each customer's latest vehicle
+        // 2️⃣ Prepare results array
         const updatedRecords: CustomerRecord[] = [];
 
+        // 3️⃣ Loop through customers
         for (const customer of customersData || []) {
-            if (customer.vehicles && customer.vehicles.length > 0) {
-                const latestVehicle = customer.vehicles.sort(
-                    (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                )[0];
+            const vehicles = customer.vehicles || [];
+            if (vehicles.length === 0) continue;
 
-                // 3️⃣ Fetch Installment History for the vehicle
-                const { data: historyRaw } = await supabase
-                    .from('installments')
-                    .select('*')
-                    .eq('vehicle_id', latestVehicle.id);
+            // Sort to get latest vehicle
+            const latestVehicle = vehicles.sort(
+                (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0];
 
-                const historyList: InstallmentHistory[] = (historyRaw || []) as InstallmentHistory[];
+            // 4️⃣ Fetch Installment History
+            const { data: historyRaw } = await supabase
+                .from("installments")
+                .select("amount_paid, paid_count, remaining_balance, payment_date")
+                .eq("vehicle_id", latestVehicle.id)
+                .order("payment_date", { ascending: true });
 
-                // 4️⃣ Calculate Remaining Loan Using Updated Logic
-                const { remainingLoan } = calculateRemainingBalanceAndCounts(
-                    latestVehicle.total_amount,
-                    latestVehicle.advance_payment,
-                    latestVehicle.installment_plan,
-                    historyList
-                );
+            const historyList: InstallmentHistory[] = (historyRaw || []) as InstallmentHistory[];
 
-                // 5️⃣ Build Record for Table Display
-                updatedRecords.push({
-                    id: customer.id,
-                    account_number: customer.account_number,
-                    customer_name: customer.customer_name,
-                    vehicle_name: latestVehicle.item_name,
-                    remaining_loan: remainingLoan, // ✅ Corrected Value
-                    created_at: customer.created_at
-                });
-            }
+            // 5️⃣ Use shared balance calculation logic
+            const { 
+                remainingLoan, 
+                totalPaidAmount, 
+                totalPaidCount, 
+                remainingCount 
+            } = calculateRemainingBalanceAndCounts(
+                latestVehicle.total_amount,
+                latestVehicle.advance_payment,
+                latestVehicle.installment_plan,
+                historyList
+            );
+
+            // 6️⃣ Push record for display
+            updatedRecords.push({
+                id: customer.id,
+                account_number: customer.account_number,
+                customer_name: customer.customer_name,
+                vehicle_name: latestVehicle.item_name,
+                remaining_loan: remainingLoan, // ✅ Correct balance
+                total_paid: totalPaidAmount, // ✅ NEW optional field
+                paid_count: totalPaidCount,
+                remaining_count: remainingCount,
+                monthly_installment: latestVehicle.monthly_installment,
+                created_at: customer.created_at
+            });
         }
 
-        // 6️⃣ Update State
+        // 7️⃣ Update State
         setCustomerRecords(updatedRecords);
         showMessage("تمام ریکارڈز کامیابی سے لوڈ ہو گئے ✅", "success");
     } catch (error: any) {
         console.error("Supabase All Customers Error:", error);
-        showMessage(URDU_LABELS.general.error + " تمام ریکارڈز لوڈ نہیں ہو سکے۔", "error");
+        showMessage(
+            URDU_LABELS.general.error + " تمام ریکارڈز لوڈ نہیں ہو سکے۔",
+            "error"
+        );
     } finally {
         setLoading(false);
     }
@@ -1929,76 +2085,128 @@ const handleFetchAllCustomers = useCallback(async () => {
 
   
   // NEW: Fetch Full Details for Printable View
-  const handleFetchFullDetails = async (customerId: string) => {
-    setLoading(true);
-    setFullDetails(null);
-    setMessage({ text: '', type: '' });
+const handleFetchFullDetails = async (customerId: string) => {
+  setLoading(true);
+  setFullDetails(null);
+  setMessage({ text: "", type: "" });
 
+  try {
+    // 1️⃣ Fetch Customer + Vehicle Details
     const { data: customerDataRaw, error: cError } = await supabase
-        .from('customers')
-        .select(`
-            id, account_number, customer_name, father_name, phone, cnic, address,
-            guarantor1_details, guarantor2_details,
-            vehicles (
-                id, item_name, registration_number, engine_number, chassis_number, model, color, insurance_docs,
-                total_amount, advance_payment, remaining_loan, monthly_installment, installment_plan, next_due_date, created_at
-            )
-        `)
-        .eq('id', customerId)
-        .limit(1)
-        .single();
-        
-    const customerData = customerDataRaw as (Omit<FullCustomerDetails, 'vehicle' | 'history' | 'totalPaidCount' | 'remainingCount' | 'totalPaidAmount' | 'totalInstallmentAmount' | 'planLength'> & { vehicles: (VehicleSummary & { engine_number: string; chassis_number: string; model: string; color: string; insurance_docs: string; })[] | null }) | null;
+      .from("customers")
+      .select(`
+        id, 
+        account_number, 
+        customer_name, 
+        father_name, 
+        phone, 
+        cnic, 
+        address,
+        guarantor1_details, 
+        guarantor2_details,
+        vehicles (
+          id, 
+          item_name, 
+          registration_number, 
+          engine_number, 
+          chassis_number, 
+          model, 
+          color, 
+          insurance_docs,
+          total_amount, 
+          advance_payment, 
+          remaining_loan, 
+          monthly_installment, 
+          installment_plan, 
+          next_due_date, 
+          created_at
+        )
+      `)
+      .eq("id", customerId)
+      .limit(1)
+      .single();
 
-    if (cError || !customerData) {
-        console.error("Supabase Full Details Error:", cError);
-        showMessage(URDU_LABELS.general.notFound, 'error');
-        setLoading(false);
-        return;
+    if (cError || !customerDataRaw) {
+      console.error("Supabase Full Details Error:", cError);
+      showMessage(URDU_LABELS.general.notFound, "error");
+      setLoading(false);
+      return;
     }
 
-    const latestVehicle = customerData.vehicles?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    // 2️⃣ Extract Latest Vehicle
+    const customerData = customerDataRaw as any;
+    const latestVehicle = customerData.vehicles?.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0];
 
     if (!latestVehicle) {
-        showMessage("گاڑی کا ریکارڈ نہیں ملا۔", 'error');
-        setLoading(false);
-        return;
+      showMessage("گاڑی کا ریکارڈ نہیں ملا۔", "error");
+      setLoading(false);
+      return;
     }
 
-    // Fetch Installment History
-    type AllInstallmentsResult = InstallmentHistory[] | null;
+    // 3️⃣ Fetch Installment History
     const { data: installmentHistoryRaw, error: iError } = await supabase
-        .from('installments')
-        .select(`*`)
-        .eq('vehicle_id', latestVehicle.id)
-        .order('payment_date', { ascending: true });
-        
-    const history = (installmentHistoryRaw as AllInstallmentsResult) || [];
-    
-    // Calculations for summary
-    const planLength = latestVehicle.installment_plan === '12 Months' ? 12 : 24;
-    const totalPaidAmount = history.reduce((sum, rec) => sum + rec.amount_paid, 0);
-    const totalPaidCount = history.filter(h => h.paid_count > 0).length;
-    const totalInstallmentAmount = latestVehicle.monthly_installment * planLength;
-    
-    setFullDetails({
-        ...customerData,
-        vehicle: latestVehicle,
-        history: history,
-        totalPaidCount: totalPaidCount,
-        remainingCount: planLength - totalPaidCount,
-        totalPaidAmount: totalPaidAmount,
-        totalInstallmentAmount: totalInstallmentAmount,
-        planLength: planLength,
-    } as FullCustomerDetails); // Type assertion is safe here
+      .from("installments")
+      .select("*")
+      .eq("vehicle_id", latestVehicle.id)
+      .order("payment_date", { ascending: true });
 
+    if (iError) throw iError;
+
+    const history: InstallmentHistory[] =
+      (installmentHistoryRaw as InstallmentHistory[]) || [];
+
+    // 4️⃣ Calculate Summary Data Using Common Function
+    const {
+      remainingLoan,
+      totalPaidAmount,
+      totalPaidCount,
+      remainingCount,
+      planLength,
+    } = calculateRemainingBalanceAndCounts(
+      latestVehicle.total_amount,
+      latestVehicle.advance_payment,
+      latestVehicle.installment_plan,
+      history
+    );
+
+    // 5️⃣ Calculate Total Installment Amount (For Summary Display)
+    const totalInstallmentAmount =
+      (latestVehicle.monthly_installment || 0) * planLength;
+
+    // 6️⃣ Build Full Details Object
+    const fullDetails: FullCustomerDetails = {
+      ...customerData,
+      vehicle: latestVehicle,
+      history: history,
+      totalPaidCount,
+      remainingCount,
+      totalPaidAmount,
+      totalInstallmentAmount,
+      planLength,
+      remainingLoan, // ✅ Added for print summary display
+    };
+
+    // 7️⃣ Update State
+    setFullDetails(fullDetails);
+    showMessage("تفصیلات کامیابی سے حاصل ہو گئیں ✅", "success");
+  } catch (error: any) {
+    console.error("Full Details Fetch Error:", error);
+    showMessage(URDU_LABELS.general.error + " مکمل تفصیلات لوڈ نہیں ہو سکیں۔", "error");
+  } finally {
     setLoading(false);
-  };
+  }
+};
  
   
   // =========================================================================
   //                             CONTENT RENDERER
   // =========================================================================
+const handlePaymentClick = () => {
+    setActiveMenu("payment"); // یا جو bhi payment view show کرنا ہو
+};
 
   const renderContent = () => {
     switch (activeMenu) {
@@ -2008,6 +2216,7 @@ const handleFetchAllCustomers = useCallback(async () => {
                     setFormState={setRegisterForm} 
                     handleSubmit={handleRegisterSubmit} 
                     loading={loading} 
+                     handlePaymentClick={handlePaymentClick} // ✅ Pass the function her
                 />;
       case 'payment':
         return <RenderPayment 
@@ -2048,6 +2257,8 @@ const handleFetchAllCustomers = useCallback(async () => {
                     setFormState={setRegisterForm} 
                     handleSubmit={handleRegisterSubmit} 
                     loading={loading} 
+                    
+                    handlePaymentClick={handlePaymentClick} // ✅ Pass te function her
                 />;
     }
   };
