@@ -1830,6 +1830,20 @@ const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
     }
 
 
+        // --- Popup / Toast Message ---
+    if (newRemaining === 0) {
+      alert("🎉 مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!");
+      showMessage("مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!", "success");
+    } else if (overpay > 0) {
+      alert(
+        `🎉 آپ نے ${overpay.toLocaleString()} روپے زیادہ ادا کیے ہیں۔ یہ رقم بطور ایڈوانس درج کی جائے گی۔`
+      );
+      showMessage("ادائیگی محفوظ ہو گئی! اضافی رقم بطور ایڈوانس محفوظ کی گئی۔", "success");
+    } else {
+      showMessage("قسط کی ادائیگی کامیابی سے محفوظ ہو گئی!", "success");
+    }
+
+
 
     // --- Re-Fetch Updated Customer Detail ---
     await handleSearchCustomer(installmentPayForm.accountNumber);
