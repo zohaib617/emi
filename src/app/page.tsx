@@ -13,6 +13,62 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'REPLACE_
 // Initialize the REAL Supabase Client 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // --- End of Supabase Client Initialization ---
+const handlePrint = () => {
+  const printContent = document.getElementById("installment-section");
+  if (!printContent) return;
+
+  const printWindow = window.open("", "", "width=900,height=700");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <html dir="rtl" lang="ur">
+      <head>
+        <title>قسط کی رسید</title>
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+        <style>
+          /* Force color printing in all browsers */
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+          }
+        </style>
+      </head>
+      <body class="bg-gray-100 py-10 print:!bg-white [print-color-adjust:exact] [-webkit-print-color-adjust:exact]">
+        <div class="max-w-2xl mx-auto bg-white border-4 border-amber-500 rounded-2xl shadow-2xl p-8">
+          <div class="text-center border-b-4 border-amber-500 pb-4 mb-6">
+            <h1 class="text-4xl font-extrabold text-amber-700">قسط رسید</h1>
+            <p class="text-gray-600 text-lg mt-1">شکریہ! آپ کی قسط کامیابی سے جمع ہو چکی ہے۔</p>
+          </div>
+
+          ${printContent.innerHTML}
+
+          <div class="mt-10 border-t border-dashed border-gray-400 pt-4 flex justify-between text-gray-700">
+            <div>
+              <p class="font-semibold">دستخطِ وصول کنندہ:</p>
+              <div class="h-10 border-b border-gray-400 w-48"></div>
+            </div>
+            <div>
+              <p class="font-semibold">تاریخ:</p>
+              <p class="border-b border-gray-400 w-32 text-center">${new Date().toLocaleDateString("ur-PK")}</p>
+            </div>
+          </div>
+
+          <p class="text-center text-sm text-gray-500 mt-6">
+            یہ رسید خودکار طور پر تیار کی گئی ہے، اس پر کسی دستخط کی ضرورت نہیں۔
+          </p>
+        </div>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+  printWindow.close();
+};
 
 // =========================================================================
 //                  TYPE DEFINITIONS (Interfaces)
@@ -624,7 +680,8 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
         </form>
 
         {payDetail && (
-          <div className="border-4 border-green-400 p-6 rounded-2xl bg-green-50 shadow-lg">
+          <div id="installment-section" className="border-4 border-green-400 p-6 rounded-2xl bg-green-50 shadow-lg">
+
             <h3 className="text-3xl font-extrabold text-green-800 mb-6 border-b pb-2">خریدار اور قسط کی تفصیلات</h3>
             
             {/* NEW: Completion Message */}
@@ -679,6 +736,16 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
                     {loading ? 'محفوظ ہو رہا ہے...' : URDU_LABELS.general.save}
                   </button>
                 </div>
+              <div className="flex items-end mb-6 mt-3">
+  <button
+    type="button"
+    onClick={handlePrint}
+    className="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold text-2xl p-4 rounded-xl transition duration-300 shadow-lg"
+  >
+    پرنٹ رسید
+  </button>
+</div>
+
               </div>
             </form>
           </div>
@@ -1646,7 +1713,7 @@ useEffect(() => {
     setLoading(false);
   };
   
-  const handleSearchCustomer = useCallback(async (accountNumber: string) => {
+const handleSearchCustomer = useCallback(async (accountNumber: string) => {
     setLoading(true);
     setFetchedCustomer(null);
     setInstallmentPayDetail(null);
@@ -1656,7 +1723,8 @@ useEffect(() => {
         id: string; customer_name: string; account_number: string;
         vehicles: VehicleSummary[] | null;
     } | null;
-
+    
+    // 1. Fetch Customer and Vehicle Data
     // *UPDATED: Added total_amount to the vehicles select query*
     const { data, error } = await supabase
         .from('customers')
@@ -1686,18 +1754,32 @@ useEffect(() => {
         
         if (activeVehicle && activeVehicle.id && activeMenu === 'installmentPay') {
             
-            type InstallmentData = { payment_date: string; paid_count: number; remaining_balance: number }[];
-            const { data: installmentData, error: _instError } = await supabase 
-                .from('installments')
-                .select('payment_date, paid_count, remaining_balance')
-                .eq('vehicle_id', activeVehicle.id)
-                .order('payment_date', { ascending: false })
-                .limit(1);
-
-            const lastPayment = (installmentData as InstallmentData)?.[0];
+            // 💡 FIX START: Fetch full installment history for accurate calculation
+            type InstallmentHistoryData = { payment_date: string; amount_paid: number }[];
             
-            // Check the most up-to-date remaining loan
-            const latestRemainingLoan = lastPayment ? lastPayment.remaining_balance : activeVehicle.remaining_loan;
+            // Installment Data کو پوری ہسٹری کے لیے fetch کریں (remaining_balance/paid_count کے بجائے amount_paid ضروری ہے)
+            const { data: installmentHistoryRaw, error: _instError } = await supabase 
+                .from('installments')
+                .select(`payment_date, amount_paid`) 
+                .eq('vehicle_id', activeVehicle.id)
+                .order('payment_date', { ascending: true }); // تاریخ کے لحاظ سے ترتیب ضروری ہے
+            
+            const history: InstallmentHistory[] = (installmentHistoryRaw as any) || []; // Use your global InstallmentHistory type
+            
+            
+            // 💡 FIX: Use the reliable helper function (calculateRemainingBalanceAndCounts)
+            // یہ فنکشن وہی ہے جو handleCheckBalance میں صحیح کام کر رہا ہے
+            const { 
+                remainingLoan, 
+                totalPaidCount 
+            } = calculateRemainingBalanceAndCounts(
+                Number(activeVehicle.total_amount),
+                Number(activeVehicle.advance_payment),
+                activeVehicle.installment_plan,
+                history
+            );
+            
+            // 💡 FIX END: Use calculated values for setInstallmentPayDetail
 
             setInstallmentPayDetail({
                 name: typedData?.customer_name || '',
@@ -1705,11 +1787,12 @@ useEffect(() => {
                 vehicle_name: activeVehicle.item_name,
                 plan: activeVehicle.installment_plan,
                 monthly_installment: activeVehicle.monthly_installment,
-                remaining_loan: latestRemainingLoan, 
-                paid_count: lastPayment ? lastPayment.paid_count : 0,
+                remaining_loan: remainingLoan, // ✅ UPDATED: Now uses calculated value
+                paid_count: totalPaidCount, // ✅ UPDATED: Now uses calculated value
                 next_due_date: activeVehicle.next_due_date,
-                total_amount: activeVehicle.total_amount, // *UPDATED: Set total amount*
+                total_amount: activeVehicle.total_amount, 
             });
+            
         } else if (activeMenu === 'installmentPay' && !activeVehicle) {
              showMessage("اس اکاؤنٹ سے کوئی گاڑی منسلک نہیں ہے۔", 'error');
              setInstallmentPayDetail(null);
@@ -1848,7 +1931,7 @@ const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
         }
 
         // --- Plan Length ---
-        const planLength = plan === "12 Months" ? 12 : 24;
+        const planLength = parseInt(plan.replace(/[^0-9]/g, ""), 10) || 0;
 
         // --- Remaining Calculation ---
         let newRemaining = remaining_loan - amount;
@@ -1912,43 +1995,42 @@ const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
         }
 
 
-        // 3. --- Success Messages ---
+        let finalMessage = "قسط کی ادائیگی کامیابی سے محفوظ ہو گئی! 👍"; // Default Success Message
+
         if (newRemaining === 0) {
             // 🎉 Loan Zero Hone Par Mubarakbad
             alert("🎉 مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!"); 
-            showMessage("مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!", "success");
-
-            // --- Re-Fetch Updated Customer Detail ---
-            await handleSearchCustomer(installmentPayForm.accountNumber);
-
-            // --- Reset Form ---
-            setInstallmentPayForm((prev) => ({ ...prev, installmentAmount: 0 }));
-            
-            setLoading(false);
-            return; // ✅ Yahan return karne se aage ka code nahi chalega (bus ho gaya)
-
+            finalMessage = "مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے! 🎉"; // Overrides default message
         } else if (overpay > 0) {
             alert(
                 `🎉 آپ نے ${overpay.toLocaleString()} روپے زیادہ ادا کیے ہیں۔ یہ رقم بطور ایڈوانس درج کی جائے گی۔`
             );
-            showMessage("ادائیگی محفوظ ہو گئی! اضافی رقم بطور ایڈوانس محفوظ کی گئی۔", "success");
-        } else {
-            showMessage("قسط کی ادائیگی کامیابی سے محفوظ ہو گئی!", "success");
-        }
+            finalMessage = "ادائیگی محفوظ ہو گئی! اضافی رقم بطور ایڈوانس محفوظ کی گئی ہے۔"; // Overrides default message
+        } 
+        // اگر نارمل قسط ہے تو finalMessage "قسط کی ادائیگی کامیابی سے محفوظ ہو گئی! 👍" رہے گا۔
 
 
-
-        // --- Re-Fetch Updated Customer Detail ---
+        // --- Re-Fetch Updated Customer Detail (Load new remaining balance/count) ---
+        // یہ ضروری ہے تاکہ نیا ڈیٹا لوڈ ہو اور نیچے میسج دکھائے
         await handleSearchCustomer(installmentPayForm.accountNumber);
+
+
+        // FIX: Re-fetch کے بعد کامیابی کا حتمی میسج دکھائیں تاکہ وہ لازمی نظر آئے
+        showMessage(finalMessage, 'success');
 
         // --- Reset Form ---
         setInstallmentPayForm((prev) => ({ ...prev, installmentAmount: 0 }));
+
+        // اگر قرض مکمل ہو گیا تھا تو یہ اب ریٹرن کرے گا۔
+        if (newRemaining === 0) {
+            setLoading(false);
+            return;
+        }
 
     } catch (err) {
         console.error("Payment Submit Error:", err);
         showMessage("کچھ غلطی ہو گئی، دوبارہ کوشش کریں۔", "error");
     }
-
     setLoading(false);
 };
 const handleCheckBalance = async () => {
@@ -2138,7 +2220,7 @@ if (isOverdue && remainingLoan > 0) {
             <div style="text-align: right; direction: rtl; font-size: 16px; line-height: 1.8;">
                 <p><b>آخری ادائیگی کی تاریخ:</b> ${lastPaymentDate ? lastPaymentDate.toLocaleDateString() : "—"}</p>
                 <p><b>اگلی قسط کی تاریخ:</b> ${nextDueDate}</p>
-                <p><b>باقی دن:</b> ${daysRemaining.toLocaleString()} دن</p>
+             
                 <hr style="margin: 10px 0; border: 0.5px solid #ccc;">
                 <p style="font-size: 18px; color: #2e7d32; font-weight: bold;">
                     💵 اگلی قسط کی رقم: ${monthlyInstallment.toLocaleString()} روپے
@@ -2183,8 +2265,7 @@ if (isOverdue && remainingLoan > 0) {
     }
 };
 
-
-// ✅ Helper — Accurate Remaining Loan Calculator
+// ✅ Helper — Accurate Remaining Loan Calculator (Final Fix)
 function calculateRemainingBalanceAndCounts(
   totalAmount: number,
   advancePayment: number,
@@ -2193,24 +2274,47 @@ function calculateRemainingBalanceAndCounts(
 ) {
   // ✅ Plan detect karega automatically (e.g. "6 Months" → 6)
   const planLength = parseInt(installmentPlan.replace(/[^0-9]/g, ""), 10) || 0;
-
+  
+  // 1. کل ادا شدہ رقم (بشمول ایڈوانس)
   const totalPaidAmount = historyList.reduce(
     (sum, rec) => sum + (Number(rec.amount_paid) || 0),
     0
   );
 
-  // 💡 Remaining loan = total - advance - all installments paid
+  // 2. بقیہ قرض (Total Loan)
   const remainingLoan = Math.max(totalAmount - totalPaidAmount, 0);
 
-  const totalPaidCount = historyList.filter(
-    (h) => Number(h.amount_paid) > 0
-  ).length;
+  // 3. قسطوں کی گنتی کے لیے اہم لاجک
+  
+  // a) اصل قابل ادائیگی قرض کی رقم (جس پر قسطیں گنی جائیں گی)
+  const totalLoanPrincipal = totalAmount - advancePayment;
 
+  // b) ماہانہ قسط کی رقم (فرض کرتے ہیں کہ یہ ہر مہینے کے لیے برابر ہے)
+  // اگر remaining_loan > 0 ہے، تو installmentAmount = monthly_installment (from vehicles table)
+  // لیکن یہاں ہم تاریخی حساب کے لیے کل پرنسپل استعمال کریں گے تاکہ تناسب درست رہے۔
+  const monthlyInstallment = Number(totalLoanPrincipal / planLength) || 0; 
+  
+  // اگر monthlyInstallment 0 ہے (مثلاً اگر قرض مکمل ادا ہو گیا ہے یا ایڈوانس ہی پورا تھا)
+  if (monthlyInstallment === 0 || totalLoanPrincipal <= 0) {
+      const finalPaidCount = (totalLoanPrincipal <= 0 && totalAmount > 0) ? planLength : 0;
+      
+      return { remainingLoan, totalPaidAmount, totalPaidCount: finalPaidCount, remainingCount: 0, planLength };
+  }
+
+  // c) کل ادا شدہ قسطوں کی رقم (صرف وہ رقم جو ایڈوانس کے بعد قسطوں کے طور پر ادا ہوئی)
+  const installmentPaymentsTotal = Math.max(0, totalPaidAmount - advancePayment);
+  
+  // d) کل ادا شدہ قسطوں کی تعداد
+  let totalPaidCount = Math.floor(installmentPaymentsTotal / monthlyInstallment);
+  
+  // یقینی بنائیں کہ گنتی پلان کی لمبائی سے زیادہ نہ ہو
+  totalPaidCount = Math.min(planLength, totalPaidCount);
+
+  // ✅ Remaining installments
   const remainingCount = Math.max(planLength - totalPaidCount, 0);
 
   return { remainingLoan, totalPaidAmount, totalPaidCount, remainingCount, planLength };
 }
-
 
 // ✅ Fixed Function — Fetch All Records with Correct Remaining Balance
 const handleFetchAllCustomers = useCallback(async () => {
