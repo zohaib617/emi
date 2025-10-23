@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, ChangeEvent, useMemo, useRef } from 'react';
 import { Menu, X, Search, DollarSign, UserPlus, FileText, CheckCircle, Clock, LogIn, LogOut, Printer, ListOrdered } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
+import Swal from "sweetalert2";
 import * as ReactDOMServer from 'react-dom/server'; 
 
 // --- Supabase Client Initialization ---
@@ -521,17 +522,25 @@ const RenderPayment: React.FC<RenderPaymentProps> = ({ formState, setFormState, 
                     {URDU_LABELS.fields.installmentPlan}
                     <span className="text-red-500 mr-1">*</span>
                 </label>
-                <select
-                    name="installmentPlan"
-                    value={formState.installmentPlan}
-                    onChange={handleChange}
-                    required
-                    className="p-3 border-2 border-slate-300 rounded-xl focus:border-amber-500 transition duration-150 text-base md:text-lg text-right font-inter bg-white"
-                    dir="rtl"
-                >
-                    <option value="12 Months">۱۲ ماہ کا پلان</option>
-                    <option value="24 Months">۲۴ ماہ کا پلان</option>
-                </select>
+<select
+    name="installmentPlan"
+    value={formState.installmentPlan}
+    onChange={handleChange}
+    required
+    className="p-3 border-2 border-slate-300 rounded-xl focus:border-amber-500 transition duration-150 text-base md:text-lg text-right font-inter bg-white"
+    dir="rtl"
+>
+    {[...Array(35)].map((_, i) => {
+        const month = i + 1;
+        const urduMonth = month.toLocaleString("ur-PK");
+        return (
+            <option key={month} value={`${month} Months`}>
+                {urduMonth} ماہ کا پلان
+            </option>
+        );
+    })}
+</select>
+
             </div>
           </div>
           
@@ -684,70 +693,144 @@ const RenderInstallmentPay: React.FC<RenderInstallmentPayProps> = ({ searchForm,
 // =========================================================================
 
 interface InstallmentHistoryTreeProps {
-    history: InstallmentHistory[];
-    isPrintView?: boolean;
+  history: InstallmentHistory[];
+  isPrintView?: boolean;
+  setHistory?: React.Dispatch<React.SetStateAction<InstallmentHistory[]>>; // 👈 add for local update
 }
 
-const InstallmentHistoryTree: React.FC<InstallmentHistoryTreeProps> = ({ history, isPrintView = false }) => {
-    if (history.length === 0) {
-        return <p className={`text-center ${isPrintView ? 'text-slate-700' : 'text-slate-500'} text-xl font-medium mt-6`}>کوئی قسط کی تاریخ نہیں ملی۔</p>;
-    }
-    
-    // Sort oldest first for a true 'timeline' view
-    const sortedHistory = [...history].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
-
+const InstallmentHistoryTree: React.FC<InstallmentHistoryTreeProps> = ({
+  history,
+  isPrintView = false,
+  setHistory,
+}) => {
+  if (history.length === 0) {
     return (
-        <div className="relative border-r-4 border-slate-300 pr-8 mt-6 pb-2 print:border-r-2 print:border-slate-500" dir="rtl">
-            <div className="absolute top-0 right-0 h-full w-4 flex flex-col items-center print:hidden">
-                {/* Vertical Line */}
-                <div className="h-full w-1 bg-slate-300"></div>
-            </div>
-            
-            {sortedHistory.map((record, index) => {
-                // Paid count 0 usually indicates the initial advance/down payment
-                const isAdvance = index === 0 && record.paid_count === 0 && record.amount_paid > 0;
-                
-                // Determine style based on payment type
-                const bgColor = isAdvance ? 'bg-amber-100 border-amber-500' : (record.paid_count > 0 ? 'bg-green-50 border-green-400' : 'bg-slate-50 border-slate-400');
-                const borderColor = isAdvance ? 'border-amber-600' : (record.paid_count > 0 ? 'border-green-600' : 'border-slate-600');
-                const titleColor = isAdvance ? 'text-amber-800' : (record.paid_count > 0 ? 'text-green-800' : 'text-slate-800');
-                const Icon = isAdvance ? DollarSign : CheckCircle;
-                
-                const titleText = isAdvance ? URDU_LABELS.general.advance + ' (پہلی ادائیگی)' : URDU_LABELS.fields.installmentNo + `: ${record.paid_count}`;
-
-                return (
-                    <div key={record.id} className="mb-8 relative pl-6">
-                        {/* Circle marker on the timeline (hide in print) */}
-                        <div className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center ${borderColor} border-4 ${bgColor} print:hidden`}>
-                            <Icon size={14} className={titleColor} />
-                        </div>
-
-                        {/* Payment Card */}
-                        <div className={`p-4 rounded-xl shadow-lg transition duration-300 hover:shadow-xl ${bgColor} border-r-4 ${borderColor} print:p-2 print:rounded-md print:shadow-none print:border print:border-slate-500 print:bg-white print:hover:shadow-none`}>
-                            <div className="flex justify-between items-start border-b pb-2 mb-2 print:border-b-0 print:mb-1">
-                                <h4 className={`text-xl font-extrabold ${titleColor} print:text-sm print:font-bold print:text-slate-800`}>{titleText}</h4>
-                                <p className="text-sm font-medium text-slate-500 flex items-center print:text-xs print:text-slate-600">
-                                    <Clock size={16} className="ml-1 print:hidden" />
-                                    {new Date(record.payment_date).toLocaleDateString('ur-PK', {
-                                        year: 'numeric', month: 'short', day: 'numeric'
-                                    })}
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-lg print:text-xs">
-                                <p className="font-bold text-slate-700 print:text-slate-800">
-                                    {URDU_LABELS.fields.amountPaid}: <span className="font-extrabold text-2xl text-green-700 mr-2 print:text-sm print:text-green-700">{record.amount_paid.toLocaleString('en-US')}</span>
-                                </p>
-                                <p className="font-bold text-slate-700 text-left print:text-slate-800">
-                                    {URDU_LABELS.fields.remainingAfter}: <span className="font-medium text-slate-600 mr-2 print:text-sm print:text-slate-600">{record.remaining_balance.toLocaleString('en-US')}</span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
+      <p
+        className={`text-center ${
+          isPrintView ? "text-slate-700" : "text-slate-500"
+        } text-xl font-medium mt-6`}
+      >
+        کوئی قسط کی تاریخ نہیں ملی۔
+      </p>
     );
+  }
+
+  // 🔹 Delete Function — Supabase se record delete karega
+  const handleDeleteInstallment = async (id: string) => {
+    if (!confirm("کیا آپ واقعی یہ قسط حذف کرنا چاہتے ہیں؟")) return;
+
+    const { error } = await supabase.from("installments").delete().eq("id", id);
+
+    if (error) {
+      alert("قسط حذف کرنے میں مسئلہ ہوا۔");
+      console.error(error);
+    } else {
+      alert("قسط کامیابی سے حذف ہو گئی۔");
+
+      // local state se bhi remove karo (agar setHistory provided hai)
+      if (setHistory) {
+        setHistory((prev) => prev.filter((h) => h.id !== id));
+      }
+    }
+  };
+
+  // Sort oldest first
+  const sortedHistory = [...history].sort(
+    (a, b) =>
+      new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+  );
+
+  return (
+    <div
+      className="relative border-r-4 border-slate-300 pr-8 mt-6 pb-2 print:border-r-2 print:border-slate-500"
+      dir="rtl"
+    >
+      <div className="absolute top-0 right-0 h-full w-4 flex flex-col items-center print:hidden">
+        <div className="h-full w-1 bg-slate-300"></div>
+      </div>
+
+      {sortedHistory.map((record, index) => {
+        const isAdvance =
+          index === 0 && record.paid_count === 0 && record.amount_paid > 0;
+
+        const bgColor = isAdvance
+          ? "bg-amber-100 border-amber-500"
+          : record.paid_count > 0
+          ? "bg-green-50 border-green-400"
+          : "bg-slate-50 border-slate-400";
+
+        const borderColor = isAdvance
+          ? "border-amber-600"
+          : record.paid_count > 0
+          ? "border-green-600"
+          : "border-slate-600";
+
+        const titleColor = isAdvance
+          ? "text-amber-800"
+          : record.paid_count > 0
+          ? "text-green-800"
+          : "text-slate-800";
+
+        const Icon = isAdvance ? DollarSign : CheckCircle;
+        const titleText = isAdvance
+          ? URDU_LABELS.general.advance + " (پہلی ادائیگی)"
+          : URDU_LABELS.fields.installmentNo + `: ${record.paid_count}`;
+
+        return (
+          <div key={record.id} className="mb-8 relative pl-6">
+            {/* Marker */}
+            <div
+              className={`absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center ${borderColor} border-4 ${bgColor} print:hidden`}
+            >
+              <Icon size={14} className={titleColor} />
+            </div>
+
+            {/* Payment Card */}
+            <div
+              className={`p-4 rounded-xl shadow-lg transition duration-300 hover:shadow-xl ${bgColor} border-r-4 ${borderColor} print:p-2 print:rounded-md print:shadow-none print:border print:border-slate-500 print:bg-white print:hover:shadow-none`}
+            >
+              <div className="flex justify-between items-start border-b pb-2 mb-2 print:border-b-0 print:mb-1">
+                <h4
+                  className={`text-xl font-extrabold ${titleColor} print:text-sm print:font-bold print:text-slate-800`}
+                >
+                  {titleText}
+                </h4>
+                <p className="text-sm font-medium text-slate-500 flex items-center print:text-xs print:text-slate-600">
+                  <Clock size={16} className="ml-1 print:hidden" />
+                  {record.payment_date.split("-").reverse().join(" ")}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-lg print:text-xs">
+                <p className="font-bold text-slate-700 print:text-slate-800">
+                  {URDU_LABELS.fields.amountPaid}:{" "}
+                  <span className="font-extrabold text-2xl text-green-700 mr-2 print:text-sm print:text-green-700">
+                    {record.amount_paid.toLocaleString("en-US")}
+                  </span>
+                </p>
+                <p className="font-bold text-slate-700 text-left print:text-slate-800">
+                  {URDU_LABELS.fields.remainingAfter}:{" "}
+                  <span className="font-medium text-slate-600 mr-2 print:text-sm print:text-slate-600">
+                    {record.remaining_balance.toLocaleString("en-US")}
+                  </span>
+                </p>
+              </div>
+
+              {/* 🔻 Delete Button */}
+              <div className="flex justify-end mt-3 print:hidden">
+                <button
+                  onClick={() => handleDeleteInstallment(record.id)}
+                  className="bg-red-600 text-white px-4 py-1 rounded-lg hover:bg-red-700 text-sm"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 
@@ -1496,27 +1579,26 @@ const App: React.FC = () => {
     setFullDetails(null); 
   };
   
-  // Auto-calculate remaining amount for Payment Form
-  useEffect(() => {
-    const total = paymentForm.totalAmount || 0;
-    const advance = paymentForm.advance || 0;
-    const remaining = total - advance;
+// Auto-calculate remaining amount for Payment Form
+useEffect(() => {
+  const total = Number(paymentForm.totalAmount) || 0;
+  const advance = Number(paymentForm.advance) || 0;
+  const remaining = total - advance;
 
-    let monthlyInstallment = 0;
-    if (paymentForm.installmentPlan === '12 Months') {
-      monthlyInstallment = remaining / 12;
-    } else if (paymentForm.installmentPlan === '24 Months') {
-      monthlyInstallment = remaining / 24;
-    }
+  // Extract number of months from installment plan (e.g. "12 Months" → 12)
+  const months = parseInt(paymentForm.installmentPlan) || 0;
 
-    setPaymentForm(prev => ({ 
-      ...prev, 
-      remainingAuto: remaining,
-      // Math.ceil is used to ensure the monthly installment covers the full remaining loan
-      monthlyInstallment: Math.ceil(monthlyInstallment) || 0
-    }));
+  // Calculate monthly installment dynamically
+  const monthlyInstallment = months > 0 ? remaining / months : 0;
 
-  }, [paymentForm.totalAmount, paymentForm.advance, paymentForm.installmentPlan]);
+  setPaymentForm(prev => ({
+    ...prev,
+    remainingAuto: remaining,
+    // Round up to next integer
+    monthlyInstallment: Math.ceil(monthlyInstallment) || 0,
+  }));
+}, [paymentForm.totalAmount, paymentForm.advance, paymentForm.installmentPlan]);
+
   
   // =========================================================================
   //                             SUPABASE API CALLS (Data Logic)
@@ -1737,242 +1819,368 @@ const App: React.FC = () => {
   };
   
 const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setMessage({ text: '', type: '' });
-
-  try {
-    if (!installmentPayDetail) {
-      showMessage("پہلے اکاؤنٹ نمبر تلاش کریں!", 'error');
-      setLoading(false);
-      return;
-    }
-
-    const { installmentAmount, paymentDate } = installmentPayForm;
-    const {
-      vehicle_id,
-      remaining_loan,
-      monthly_installment,
-      paid_count,
-      next_due_date,
-      plan,
-    } = installmentPayDetail;
-
-    const amount = Number(installmentAmount);
-    if (isNaN(amount) || amount <= 0) {
-      showMessage("ادائیگی کی رقم درست نہیں ہے۔", "error");
-      setLoading(false);
-      return;
-    }
-
-    // --- Plan Length ---
-    const planLength = plan === "12 Months" ? 12 : 24;
-
-    // --- Remaining Calculation ---
-    let newRemaining = remaining_loan - amount;
-    let overpay = 0;
-    if (newRemaining < 0) {
-      overpay = Math.abs(newRemaining);
-      newRemaining = 0;
-    }
-
-    // --- Paid Count Calculation ---
-    const installmentsCovered = Math.floor(amount / monthly_installment);
-    let newPaidCount = Math.min(planLength, paid_count + installmentsCovered);
-
-    // --- Due Date Calculation ---
-    let newDueDate = next_due_date;
-    if (next_due_date && newRemaining > 0) {
-      const nextDate = new Date(next_due_date);
-      nextDate.setMonth(nextDate.getMonth() + installmentsCovered);
-      newDueDate = nextDate.toISOString().substring(0, 10);
-    } else if (newRemaining === 0) {
-      newDueDate = null; // loan complete
-      newPaidCount = planLength;
-    }
-
-    // --- Insert Record ---
-    const installmentRecord = {
-      vehicle_id,
-      payment_date: paymentDate,
-      amount_paid: amount,
-      paid_count: newPaidCount,
-      remaining_balance: newRemaining,
-    };
-
-    const { error: installmentError } = await supabase
-      .from("installments")
-      .insert([installmentRecord]);
-        
-     if (installmentError) {
-      console.error("Supabase Installment Payment Error:", installmentError);
-      showMessage("ادائیگی محفوظ نہیں ہو سکی۔", "error");
-      } else {
-        showMessage(URDU_LABELS.general.success + " ادائیگی محفوظ  ہو سکی۔!", 'success');
-     setLoading(false);
-      return;
-    }
-
-    // --- Update Vehicle Loan ---
-    const { error: vehicleUpdateError } = await supabase
-      .from("vehicles")
-      .update({
-        remaining_loan: newRemaining,
-        next_due_date: newDueDate,
-      })
-      .eq("id", vehicle_id);
-
-    if (vehicleUpdateError) {
-      console.error("Supabase Vehicle Update Error:", vehicleUpdateError);
-      showMessage("گاڑی کا ریکارڈ اپ ڈیٹ نہیں ہو سکا۔", "error");
-      setLoading(false);
-      return;
-    }
-
-
-        // --- Popup / Toast Message ---
-    if (newRemaining === 0) {
-      alert("🎉 مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!");
-      showMessage("مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!", "success");
-    } else if (overpay > 0) {
-      alert(
-        `🎉 آپ نے ${overpay.toLocaleString()} روپے زیادہ ادا کیے ہیں۔ یہ رقم بطور ایڈوانس درج کی جائے گی۔`
-      );
-      showMessage("ادائیگی محفوظ ہو گئی! اضافی رقم بطور ایڈوانس محفوظ کی گئی۔", "success");
-    } else {
-      showMessage("قسط کی ادائیگی کامیابی سے محفوظ ہو گئی!", "success");
-    }
-
-
-
-    // --- Re-Fetch Updated Customer Detail ---
-    await handleSearchCustomer(installmentPayForm.accountNumber);
-
-    // --- Reset Form ---
-    setInstallmentPayForm((prev) => ({ ...prev, installmentAmount: 0 }));
-
-  } catch (err) {
-    console.error("Payment Submit Error:", err);
-    showMessage("کچھ غلطی ہو گئی، دوبارہ کوشش کریں۔", "error");
-  }
-
-  setLoading(false);
-};
-
-
-const handleCheckBalance = async () => {
-  try {
+    e.preventDefault();
     setLoading(true);
-    setBalanceResult(null);
     setMessage({ text: '', type: '' });
 
-    const { searchKey, searchType } = checkBalanceForm;
-    let customerId: string | null = null;
+    try {
+        if (!installmentPayDetail) {
+            showMessage("پہلے اکاؤنٹ نمبر تلاش کریں!", 'error');
+            setLoading(false);
+            return;
+        }
 
-    if (searchType === "accountNumber") {
-      const { data: customerData, error: _cError } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("account_number", searchKey)
-        .single();
+        const { installmentAmount, paymentDate } = installmentPayForm;
+        const {
+            vehicle_id,
+            remaining_loan,
+            monthly_installment,
+            paid_count,
+            next_due_date,
+            plan,
+        } = installmentPayDetail;
 
-      if (_cError || !customerData) {
-        showMessage(URDU_LABELS.general.notFound, "error");
-        setLoading(false);
-        return;
-      }
+        const amount = Number(installmentAmount);
+        if (isNaN(amount) || amount <= 0) {
+            showMessage("ادائیگی کی رقم درست نہیں ہے۔", "error");
+            setLoading(false);
+            return;
+        }
 
-      customerId = customerData.id;
+        // --- Plan Length ---
+        const planLength = plan === "12 Months" ? 12 : 24;
+
+        // --- Remaining Calculation ---
+        let newRemaining = remaining_loan - amount;
+        let overpay = 0;
+        if (newRemaining < 0) {
+            overpay = Math.abs(newRemaining);
+            newRemaining = 0;
+        }
+
+        // --- Paid Count Calculation ---
+        const installmentsCovered = Math.floor(amount / monthly_installment);
+        // Ensure paid_count doesn't exceed plan length (for display)
+        let newPaidCount = Math.min(planLength, paid_count + installmentsCovered);
+
+        // --- Due Date Calculation ---
+        let newDueDate = next_due_date;
+        if (next_due_date && newRemaining > 0) {
+            const nextDate = new Date(next_due_date);
+            // Months plus karo
+            nextDate.setMonth(nextDate.getMonth() + installmentsCovered);
+            newDueDate = nextDate.toISOString().substring(0, 10);
+        } else if (newRemaining === 0) {
+            newDueDate = null; // loan complete hone par date null
+            newPaidCount = planLength; // paid_count ko full plan par set karo
+        }
+
+        // 1. --- Insert Installment Record ---
+        const installmentRecord = {
+            vehicle_id,
+            payment_date: paymentDate,
+            amount_paid: amount,
+            paid_count: newPaidCount,
+            remaining_balance: newRemaining,
+        };
+
+        const { error: installmentError } = await supabase
+            .from("installments")
+            .insert([installmentRecord]);
+            
+        if (installmentError) {
+            console.error("Supabase Installment Payment Error:", installmentError);
+            showMessage("ادائیگی محفوظ نہیں ہو سکی۔", "error");
+            setLoading(false);
+            return;
+        }
+        
+        // 2. --- Update Vehicle Loan (NEXT_DUE_DATE ko yahan update karein) ---
+        const { error: vehicleUpdateError } = await supabase
+            .from("vehicles")
+            .update({
+                remaining_loan: newRemaining,
+                next_due_date: newDueDate,
+            })
+            .eq("id", vehicle_id);
+
+        if (vehicleUpdateError) {
+            console.error("Supabase Vehicle Update Error:", vehicleUpdateError);
+            showMessage("گاڑی کا ریکارڈ اپ ڈیٹ نہیں ہو سکا۔", "error");
+            setLoading(false);
+            return;
+        }
+
+
+        // 3. --- Success Messages ---
+        if (newRemaining === 0) {
+            // 🎉 Loan Zero Hone Par Mubarakbad
+            alert("🎉 مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!"); 
+            showMessage("مبارک ہو! قرض مکمل طور پر ادا ہو گیا ہے!", "success");
+
+            // --- Re-Fetch Updated Customer Detail ---
+            await handleSearchCustomer(installmentPayForm.accountNumber);
+
+            // --- Reset Form ---
+            setInstallmentPayForm((prev) => ({ ...prev, installmentAmount: 0 }));
+            
+            setLoading(false);
+            return; // ✅ Yahan return karne se aage ka code nahi chalega (bus ho gaya)
+
+        } else if (overpay > 0) {
+            alert(
+                `🎉 آپ نے ${overpay.toLocaleString()} روپے زیادہ ادا کیے ہیں۔ یہ رقم بطور ایڈوانس درج کی جائے گی۔`
+            );
+            showMessage("ادائیگی محفوظ ہو گئی! اضافی رقم بطور ایڈوانس محفوظ کی گئی۔", "success");
+        } else {
+            showMessage("قسط کی ادائیگی کامیابی سے محفوظ ہو گئی!", "success");
+        }
+
+
+
+        // --- Re-Fetch Updated Customer Detail ---
+        await handleSearchCustomer(installmentPayForm.accountNumber);
+
+        // --- Reset Form ---
+        setInstallmentPayForm((prev) => ({ ...prev, installmentAmount: 0 }));
+
+    } catch (err) {
+        console.error("Payment Submit Error:", err);
+        showMessage("کچھ غلطی ہو گئی، دوبارہ کوشش کریں۔", "error");
     }
 
-    let query = supabase
-      .from("vehicles")
-      .select(`*, customer:customer_id(customer_name)`)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    setLoading(false);
+};
+const handleCheckBalance = async () => {
+    try {
+        setLoading(true);
+        setBalanceResult(null);
+        setMessage({ text: '', type: '' });
 
-    if (customerId) query = query.eq("customer_id", customerId);
-    else query = query.eq("registration_number", searchKey);
+        const { searchKey, searchType } = checkBalanceForm;
+        let customerId: string | null = null;
 
-    const { data: vehicleDataRaw, error: vError } = await query.single();
-    const vehicleData = vehicleDataRaw as (VehicleSummary & { customer: { customer_name: string } }) | null;
+        // 1. Fetch Customer ID
+        if (searchType === "accountNumber") {
+            const { data: customerData, error: _cError } = await supabase
+                .from("customers")
+                .select("id")
+                .eq("account_number", searchKey)
+                .single();
 
-    if (vError || !vehicleData || !vehicleData.customer) {
-      showMessage(URDU_LABELS.general.notFound, "error");
-      setLoading(false);
-      return;
+            if (_cError || !customerData) {
+                showMessage(URDU_LABELS.general.notFound, "error");
+                setLoading(false);
+                return;
+            }
+
+            customerId = customerData.id;
+        }
+
+        // 2. Build Vehicle Query
+        let query = supabase
+            .from("vehicles")
+            .select(`*, customer:customer_id(customer_name)`)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        if (customerId) query = query.eq("customer_id", customerId);
+        else query = query.eq("registration_number", searchKey);
+
+        // 3. Fetch Vehicle Data
+        const { data: vehicleDataRaw, error: vError } = await query.single();
+        const vehicleData = vehicleDataRaw as (VehicleSummary & { customer: { customer_name: string } }) | null;
+
+        if (vError || !vehicleData || !vehicleData.customer) {
+            showMessage(URDU_LABELS.general.notFound, "error");
+            setLoading(false);
+            return;
+        }
+
+        // 4. Fetch Installment History
+        const { data: installmentHistoryRaw, error: _iError } = await supabase
+            .from("installments")
+            .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
+            .eq("vehicle_id", vehicleData.id)
+            .order("payment_date", { ascending: true });
+
+        if (_iError) {
+            showMessage("قسط کی تفصیل حاصل کرنے میں مسئلہ ہوا۔", "error");
+            setLoading(false);
+            return;
+        }
+
+        const history: InstallmentHistory[] = installmentHistoryRaw || [];
+
+        const {
+            remainingLoan,
+            totalPaidAmount,
+            totalPaidCount,
+            remainingCount,
+        } = calculateRemainingBalanceAndCounts(
+            Number(vehicleData.total_amount),
+            Number(vehicleData.advance_payment),
+            vehicleData.installment_plan,
+            history
+        );
+
+        // --- Date Comparison and Overdue Calculation (FIXED) ---
+        let daysOverdue = 0;
+        let isOverdue = false;
+        
+        // Ensure nextDueDate is cleaned and checked for existence
+        const nextDueDate = vehicleData.next_due_date?.trim() ?? null; // Use trim() and ensure it's null, not undefined
+
+        if (nextDueDate && remainingLoan > 0) {
+            const today = new Date();
+            const nextDueDateObj = new Date(nextDueDate);
+
+            // Check if the date is valid before comparison
+            if (!isNaN(nextDueDateObj.getTime())) {
+                
+                // Use UTC comparison to correctly calculate days difference (Fixes 1-day bug)
+                const todayUTC = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+                const nextDueUTC = Date.UTC(nextDueDateObj.getFullYear(), nextDueDateObj.getMonth(), nextDueDateObj.getDate());
+
+                const diffInTime = todayUTC - nextDueUTC;
+                
+                daysOverdue = Math.floor(diffInTime / (1000 * 60 * 60 * 24));
+                
+                isOverdue = daysOverdue > 0;
+            } else {
+                console.error(`Invalid date format for nextDueDate: ${nextDueDate}`);
+            }
+        } else {
+            daysOverdue = 0;
+            isOverdue = false;
+        }
+        // --- End of Date Calculation Fix ---
+
+        const isCompleted = remainingLoan <= 0;
+
+        // --- ALERT LOGIC (Robust Calculation) ---
+// --- ALERT LOGIC (Finalized: Day-based Overdue Calculation) ---
+
+// 1. Calculate Overdue Amount (based on days overdue)
+// --- ALERT LOGIC (Final Version with Per-Day Late Fee) ---
+
+
+// --- ALERT LOGIC (HTML Stylish Version) ---
+let totalOverdueInstallmentAmount = 0;
+let totalLateFee = 0;
+let totalDueAmount = 0;
+let installmentsMissed = 0;
+
+if (isOverdue && remainingLoan > 0) {
+    const monthlyInstallment = Number(vehicleData.monthly_installment) || 0;
+    const daysInMonth = 30;
+
+    installmentsMissed = Math.floor(daysOverdue / daysInMonth);
+    if (installmentsMissed === 0 && daysOverdue > 0) installmentsMissed = 1;
+
+    totalOverdueInstallmentAmount = monthlyInstallment * installmentsMissed;
+    const dailyLateAccrual = Math.ceil(monthlyInstallment / daysInMonth);
+    totalLateFee = dailyLateAccrual * daysOverdue;
+    totalDueAmount = totalOverdueInstallmentAmount + totalLateFee;
+
+    if (totalDueAmount === 0 && monthlyInstallment > 0) {
+        totalDueAmount = monthlyInstallment + totalLateFee;
+        totalOverdueInstallmentAmount = monthlyInstallment;
     }
 
-    const { data: installmentHistoryRaw, error: _iError } = await supabase
-      .from("installments")
-      .select(`id, payment_date, amount_paid, paid_count, remaining_balance`)
-      .eq("vehicle_id", vehicleData.id)
-      .order("payment_date", { ascending: true });
-
-    if (_iError) {
-      showMessage("قسط کی تفصیل حاصل کرنے میں مسئلہ ہوا۔", "error");
-      setLoading(false);
-      return;
-    }
-
-    const history: InstallmentHistory[] = installmentHistoryRaw || [];
-
-    const {
-      remainingLoan,
-      totalPaidAmount,
-      totalPaidCount,
-      remainingCount,
-      planLength,
-    } = calculateRemainingBalanceAndCounts(
-      Number(vehicleData.total_amount),
-      Number(vehicleData.advance_payment),
-      vehicleData.installment_plan,
-      history
-    );
-
-    // Safe date handling (avoid new Date(null) TypeScript error)
-    let daysOverdue = 0;
-    let isOverdue = false;
-    const nextDueDate = vehicleData.next_due_date; // string | null
-
-    if (nextDueDate && remainingLoan > 0) {
-      const today = new Date();
-      const nextDueDateObj = new Date(nextDueDate);
-      today.setHours(0, 0, 0, 0);
-      nextDueDateObj.setHours(0, 0, 0, 0);
-
-      daysOverdue = Math.floor((today.getTime() - nextDueDateObj.getTime()) / (1000 * 60 * 60 * 24));
-      isOverdue = daysOverdue > 0;
-    } else {
-      daysOverdue = 0;
-      isOverdue = false;
-    }
-
-    const isCompleted = remainingLoan <= 0;
-
-    setBalanceResult({
-      name: vehicleData.customer.customer_name,
-      vehicle: vehicleData.item_name,
-      totalAmount: vehicleData.total_amount,
-      totalAdvance: vehicleData.advance_payment,
-      totalPaid: totalPaidAmount, // <-- ensure BalanceResultType includes this property
-      remainingLoan,
-      installmentAmount: vehicleData.monthly_installment,
-      nextDueDate,
-      paidCount: totalPaidCount,
-      remainingCount: isCompleted ? 0 : remainingCount,
-      isOverdue: isOverdue && !isCompleted,
-      daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
-      isCompleted,
-      history,
+    // 🟥 Stylish HTML Alert (Late Installment)
+    Swal.fire({
+        title: "🚨 قسط میں تاخیر!",
+        html: `
+            <div style="text-align: right; direction: rtl; font-size: 16px; line-height: 1.8;">
+                <p><b>کل تاخیر:</b> ${daysOverdue.toLocaleString()} دن</p>
+                <p><b>تاخیر شدہ قسطیں:</b> ${installmentsMissed.toLocaleString()}</p>
+                <hr style="margin: 10px 0; border: 0.5px solid #ccc;">
+                <p><b>واجب الادا قسطوں کی رقم:</b> ${totalOverdueInstallmentAmount.toLocaleString()} روپے</p>
+                <p><b>روزانہ لیٹ فیس:</b> ${dailyLateAccrual.toLocaleString()} روپے</p>
+                <p><b>کل لیٹ فیس:</b> ${totalLateFee.toLocaleString()} روپے</p>
+                <hr style="margin: 10px 0; border: 0.5px solid #ccc;">
+                <p style="font-size: 18px; color: #d32f2f; font-weight: bold;">
+                    💰 کل واجب الادا رقم: ${totalDueAmount.toLocaleString()} روپے
+                </p>
+            </div>
+        `,
+        icon: "error",
+        confirmButtonText: "ٹھیک ہے",
+        confirmButtonColor: "#d33",
+        background: "#fff",
+        color: "#333",
     });
 
-    setLoading(false);
-  } catch (err) {
-    console.error(err);
-    showMessage("کچھ غلط ہو گیا، دوبارہ کوشش کریں۔", "error");
-    setLoading(false);
-  }
+} else if (daysOverdue < 0) {
+    const monthlyInstallment = Number(vehicleData.monthly_installment) || 0;
+
+    // ✅ Find last payment date from installment history
+    let lastPaymentDate: Date | null = null;
+    if (history && history.length > 0) {
+        const lastInstallment = history[history.length - 1]; // last paid installment
+        lastPaymentDate = new Date(lastInstallment.payment_date);
+    }
+
+    // ✅ Use last payment date (if available) otherwise current date
+    const startDate = lastPaymentDate || new Date();
+    const nextDueDateObj = nextDueDate ? new Date(nextDueDate) : new Date();
+
+
+    // ✅ Calculate remaining days based on last payment → next due
+    const diffInMs = nextDueDateObj.getTime() - startDate.getTime();
+    const daysRemaining = Math.max(0, Math.ceil(diffInMs / (1000 * 60 * 60 * 24)));
+
+    // 🟢 Stylish Alert (Remaining Days Fixed)
+    Swal.fire({
+        title: "✅ قسط وقت پر ہے!",
+        html: `
+            <div style="text-align: right; direction: rtl; font-size: 16px; line-height: 1.8;">
+                <p><b>آخری ادائیگی کی تاریخ:</b> ${lastPaymentDate ? lastPaymentDate.toLocaleDateString() : "—"}</p>
+                <p><b>اگلی قسط کی تاریخ:</b> ${nextDueDate}</p>
+                <p><b>باقی دن:</b> ${daysRemaining.toLocaleString()} دن</p>
+                <hr style="margin: 10px 0; border: 0.5px solid #ccc;">
+                <p style="font-size: 18px; color: #2e7d32; font-weight: bold;">
+                    💵 اگلی قسط کی رقم: ${monthlyInstallment.toLocaleString()} روپے
+                </p>
+            </div>
+        `,
+        icon: "success",
+        confirmButtonText: "ٹھیک ہے",
+        confirmButtonColor: "#2e7d32",
+        background: "#f8fff8",
+        color: "#222",
+    });
+}
+
+// --- END OF ALERT LOGIC ---
+        // --- End of Alert Logic ---
+
+
+        setBalanceResult({
+            name: vehicleData.customer.customer_name,
+            vehicle: vehicleData.item_name,
+            totalAmount: vehicleData.total_amount,
+            // FIX: Use ?? null to handle undefined and satisfy TypeScript (string | null)
+            totalAdvance: vehicleData.advance_payment ?? null, 
+            totalPaid: totalPaidAmount,
+            remainingLoan,
+            installmentAmount: vehicleData.monthly_installment,
+            nextDueDate,
+            paidCount: totalPaidCount,
+            remainingCount: isCompleted ? 0 : remainingCount,
+            isOverdue: isOverdue && !isCompleted,
+            daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
+            isCompleted,
+            history,
+        });
+
+        setLoading(false);
+    } catch (err) {
+        console.error(err);
+        showMessage("کچھ غلط ہو گیا، دوبارہ کوشش کریں۔", "error");
+        setLoading(false);
+    }
 };
 
 
@@ -1983,8 +2191,8 @@ function calculateRemainingBalanceAndCounts(
   installmentPlan: string,
   historyList: InstallmentHistory[]
 ) {
-  const planLength =
-    installmentPlan?.includes("12") ? 12 : installmentPlan?.includes("24") ? 24 : 0;
+  // ✅ Plan detect karega automatically (e.g. "6 Months" → 6)
+  const planLength = parseInt(installmentPlan.replace(/[^0-9]/g, ""), 10) || 0;
 
   const totalPaidAmount = historyList.reduce(
     (sum, rec) => sum + (Number(rec.amount_paid) || 0),
@@ -2002,6 +2210,7 @@ function calculateRemainingBalanceAndCounts(
 
   return { remainingLoan, totalPaidAmount, totalPaidCount, remainingCount, planLength };
 }
+
 
 // ✅ Fixed Function — Fetch All Records with Correct Remaining Balance
 const handleFetchAllCustomers = useCallback(async () => {
