@@ -1511,8 +1511,8 @@ const App: React.FC = () => {
   const [loggedInUsername, setLoggedInUsername] = useState<string>('');
   
   // Hardcoded credentials
-  const CORRECT_USERNAME = 'zohan';
-  const CORRECT_PASSWORD = '7575';
+  const CORRECT_USERNAME = 'Akhtar';
+  const CORRECT_PASSWORD = '78678600';
 
   const handleLogin = (username: string, password: string) => {
       setLoading(true);
