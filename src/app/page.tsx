@@ -206,7 +206,7 @@ const URDU_LABELS = {
   tagline: "قسطوں پر گاڑیوں کے لین دین کا نظام",
   menu: {
     register: "Add Customer",
-    payment: "Add Item &  Payment",
+    payment: "گھڑی کی معلومات درج کریں ",
     installmentPay: "Installment Pay",
     checkBalance: "Check Balance",
     allRecords: "All Record", 
@@ -420,8 +420,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, setIsSidebarOpen, acti
             </div>
             <nav className="space-y-4 pt-10 lg:pt-0">
                 <MenuButton icon={UserPlus} label={URDU_LABELS.menu.register} menuKey="register" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
-                <MenuButton icon={FileText} label={URDU_LABELS.menu.installmentPay} menuKey="installmentPay" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
-                <MenuButton icon={Search} label={URDU_LABELS.menu.checkBalance} menuKey="checkBalance" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
+
                 {/* NEW: All Records Button */}
                 <MenuButton icon={ListOrdered} label={URDU_LABELS.menu.allRecords} menuKey="allRecords" activeMenu={activeMenu} setActiveMenu={handleMenuClick} resetUIState={resetUIState} />
             </nav>
@@ -517,113 +516,121 @@ interface RenderPaymentProps {
     fetchedCustomer: CustomerType | null;
 }
 
-const RenderPayment: React.FC<RenderPaymentProps> = ({ formState, setFormState, handleSubmit, handleSearchWrapper, loading, fetchedCustomer }) => {
+const RenderPayment: React.FC<RenderPaymentProps> = ({
+  formState,
+  setFormState,
+  handleSubmit,
+  handleSearchWrapper,
+  loading,
+  fetchedCustomer,
+}) => {
   const handleChange: FormChangeHandler = (e) => {
-    let value: string | number = e.target.value;
-
-    if (e.target.name === 'totalAmount' || e.target.name === 'advance') {
-      value = e.target.value === '' ? '' : parseFloat(e.target.value);
-    }
-
-    setFormState({ ...formState, [e.target.name]: value as any });
+    setFormState({ ...formState, [e.target.name]: e.target.value });
   };
 
+  return (
+    <div
+      className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto"
+      dir="rtl"
+    >
+      <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
+        گاڑی کی معلومات فارم
+      </h2>
 
-    return (
-      <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto" dir="rtl">
-        <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
-          Payment فارم
-        </h2>
-        <form onSubmit={handleSubmit}>
-          {/* Account Search and Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border border-slate-200 rounded-xl bg-slate-50">
-            <div className="md:col-span-2">
-              <FormField
-                label={URDU_LABELS.fields.accountNumber}
-                name="accountNumber"
-                value={formState.accountNumber}
-                onChange={handleChange}
-                placeholder="اکاؤنٹ نمبر درج کریں"
-              />
-            </div>
-            <div className="flex items-end mb-6 md:mb-0">
-              <button
-                type="button"
-                onClick={handleSearchWrapper}
-                disabled={loading}
-                className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-500"
-              >
-                <Search size={20} className="ml-2" />
-                {loading ? 'تلاش ہو رہی ہے...' : URDU_LABELS.general.search}
-              </button>
-            </div>
-            {fetchedCustomer && (
-              <div className="md:col-span-3 p-3 bg-green-100 rounded-lg text-green-800 text-right font-bold text-xl">
-                خریدار کا نام: **{fetchedCustomer.customer_name}**
-              </div>
-            )}
+      <form onSubmit={handleSubmit}>
+        {/* 🔍 Account Search */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 border border-slate-200 rounded-xl bg-slate-50">
+          <div className="md:col-span-2">
+            <FormField
+              label={URDU_LABELS.fields.accountNumber}
+              name="accountNumber"
+              value={formState.accountNumber}
+              onChange={handleChange}
+              placeholder="اکاؤنٹ نمبر درج کریں"
+            />
           </div>
-
-          {/* Payment Details */}
-          <h3 className="text-3xl font-extrabold text-slate-700 mb-6">مالی تفصیلات</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-            <FormField label={URDU_LABELS.fields.date} name="date" type="date" value={formState.date} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.totalAmount} name="totalAmount" type="number" value={formState.totalAmount === 0 ? '' : formState.totalAmount} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.advance} name="advance" type="number" value={formState.advance === 0 ? '' : formState.advance} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.monthlyInstallment} name="monthlyInstallment" type="text" value={formState.monthlyInstallment.toLocaleString('en-US')} isReadonly isRequired={false} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.remainingAuto} name="remainingAuto" type="text" value={formState.remainingAuto.toLocaleString('en-US')} isReadonly isRequired={false} onChange={handleChange} />
-            
-            <div className="flex flex-col mb-6">
-                <label className="text-right block mb-2 font-bold text-slate-800 text-lg md:text-xl">
-                    {URDU_LABELS.fields.installmentPlan}
-                    <span className="text-red-500 mr-1">*</span>
-                </label>
-<select
-    name="installmentPlan"
-    value={formState.installmentPlan}
-    onChange={handleChange}
-    required
-    className="p-3 border-2 border-slate-300 rounded-xl focus:border-amber-500 transition duration-150 text-base md:text-lg text-right font-inter bg-white"
-    dir="rtl"
->
-    {[...Array(35)].map((_, i) => {
-        const month = i + 1;
-        const urduMonth = month.toLocaleString("ur-PK");
-        return (
-            <option key={month} value={`${month} Months`}>
-                {urduMonth} ماہ کا پلان
-            </option>
-        );
-    })}
-</select>
-
-            </div>
+          <div className="flex items-end mb-6 md:mb-0">
+            <button
+              type="button"
+              onClick={handleSearchWrapper}
+              disabled={loading}
+              className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-500"
+            >
+              <Search size={20} className="ml-2" />
+              {loading ? "تلاش ہو رہی ہے..." : URDU_LABELS.general.search}
+            </button>
           </div>
-          
-          {/* Vehicle/Item Details */}
-          <h3 className="text-3xl font-extrabold text-slate-700 mb-6 mt-8">گاڑی/آئٹم کی تفصیلات</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-            <FormField label={URDU_LABELS.fields.itemName} name="itemName" value={formState.itemName} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.model} name="model" value={formState.model} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.registrationNumber} name="registrationNumber" value={formState.registrationNumber} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.engineNumber} name="engineNumber" value={formState.engineNumber} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.chassisNumber} name="chassisNumber" value={formState.chassisNumber} onChange={handleChange} />
-            <FormField label={URDU_LABELS.fields.color} name="color" value={formState.color} onChange={handleChange} />
-            <div className="md:col-span-2">
-              <FormField label={URDU_LABELS.fields.insuranceDocs} name="insuranceDocs" isTextArea value={formState.insuranceDocs} onChange={handleChange} isRequired={false} />
+          {fetchedCustomer && (
+            <div className="md:col-span-3 p-3 bg-green-100 rounded-lg text-green-800 text-right font-bold text-xl">
+              خریدار کا نام: **{fetchedCustomer.customer_name}**
             </div>
-          </div>
+          )}
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading || !fetchedCustomer}
-            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-2xl p-4 rounded-xl transition duration-300 shadow-lg mt-6 disabled:bg-slate-500"
-          >
-            {loading ? 'محفوظ ہو رہا ہے...' : URDU_LABELS.general.save}
-          </button>
-        </form>
-      </div>
-    );
+        {/* 🚗 Vehicle / Item Details */}
+        <h3 className="text-3xl font-extrabold text-slate-700 mb-6 mt-8">
+          گاڑی / آئٹم کی تفصیلات
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          <FormField
+            label={URDU_LABELS.fields.itemName}
+            name="itemName"
+            value={formState.itemName}
+            onChange={handleChange}
+          />
+          <FormField
+            label={URDU_LABELS.fields.model}
+            name="model"
+            value={formState.model}
+            onChange={handleChange}
+          />
+          <FormField
+            label={URDU_LABELS.fields.registrationNumber}
+            name="registrationNumber"
+            value={formState.registrationNumber}
+            onChange={handleChange}
+          />
+          <FormField
+            label={URDU_LABELS.fields.engineNumber}
+            name="engineNumber"
+            value={formState.engineNumber}
+            onChange={handleChange}
+          />
+          <FormField
+            label={URDU_LABELS.fields.chassisNumber}
+            name="chassisNumber"
+            value={formState.chassisNumber}
+            onChange={handleChange}
+          />
+          <FormField
+            label={URDU_LABELS.fields.color}
+            name="color"
+            value={formState.color}
+            onChange={handleChange}
+          />
+          <div className="md:col-span-2">
+            <FormField
+              label={URDU_LABELS.fields.insuranceDocs}
+              name="insuranceDocs"
+              isTextArea
+              value={formState.insuranceDocs}
+              onChange={handleChange}
+              isRequired={false}
+            />
+          </div>
+        </div>
+
+        {/* ✅ Save Button */}
+        <button
+          type="submit"
+          disabled={loading || !fetchedCustomer}
+          className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-2xl p-4 rounded-xl transition duration-300 shadow-lg mt-6 disabled:bg-slate-500"
+        >
+          {loading ? "محفوظ ہو رہا ہے..." : URDU_LABELS.general.save}
+        </button>
+      </form>
+    </div>
+  );
 };
 
 interface RenderInstallmentPayProps {
@@ -1059,183 +1066,154 @@ const InfoRow: React.FC<{ label: string; value: string | number | null; classNam
 );
 
 const PrintableDetailsView: React.FC<PrintableDetailsViewProps> = ({ details, onClose }) => {
-    
-    const printRef = useRef<HTMLDivElement>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [registration, setRegistration] = useState(details.vehicle.registration_number || "");
+  const [insurance, setInsurance] = useState(details.vehicle.insurance_docs || "");
+  const [updating, setUpdating] = useState(false);
 
-    const handlePrint = () => {
-        if (printRef.current) {
-            // Use browser's built-in print functionality
-            const printContent = printRef.current.outerHTML;
-            const printWindow = window.open('', '_blank');
-            if(printWindow) {
-                printWindow.document.write(`
-                    <html>
-                        <head>
-                            <title>${details.customer_name} - ${details.account_number}</title>
-                            <style>
-                                @page { size: A4; margin: 15mm; }
-                                body { font-family: 'Arial', sans-serif; direction: rtl; text-align: right; }
-                                .print-container { padding: 10px; }
-                                .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
-                                h1 { font-size: 24px; margin: 0; }
-                                h2 { font-size: 18px; margin-top: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-                                .section { margin-bottom: 20px; }
-                                .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-                                .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-                                .info-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted #ccc; font-size: 12px; }
-                                .info-row span:first-child { font-weight: bold; }
-                                .history-timeline { border-right: 1px solid #ccc; padding-right: 15px; }
-                                .history-item { margin-bottom: 10px; padding-right: 10px; border-right: 3px solid #666; position: relative; }
-                                .history-item::before { content: ''; position: absolute; right: -5px; top: 0; width: 10px; height: 10px; background: #666; border-radius: 50%; }
-                                .history-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 3px; margin-bottom: 5px;}
-                                .history-details { display: flex; justify-content: space-between; font-size: 11px;}
-                            </style>
-                        </head>
-                        <body>
-                            ${printContent}
-                        </body>
-                    </html>
-                `);
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-            }
-        }
-    };
-    
-    // Total amounts for summary
-    const totalPaidAmount = details.history.reduce((sum, rec) => sum + rec.amount_paid, 0);
-    const planLength = details.vehicle.installment_plan === '12 Months' ? 12 : 24;
-    const remainingCount = planLength - details.totalPaidCount;
-    
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" dir="rtl">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto print:max-h-none print:w-auto print:shadow-none print:rounded-none print:absolute print:inset-0 print:m-0" ref={printRef}>
-                
-                {/* Header and Controls */}
-                <div className="p-4 sm:p-6 sticky top-0 bg-white border-b-4 border-amber-600 z-10 print:hidden">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-4xl font-extrabold text-amber-700">ریکارڈ کی مکمل تفصیلات</h2>
-                        <button 
-                            onClick={onClose} 
-                            className="bg-red-500 hover:bg-red-600 text-white p-3 rounded-full font-bold transition flex items-center"
-                        >
-                            <X size={20} className="ml-2" />
-                            {URDU_LABELS.general.close}
-                        </button>
-                    </div>
-                    <button 
-                        onClick={handlePrint} 
-                        className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition flex items-center justify-center text-xl"
-                    >
-                        <Printer size={24} className="ml-2" />
-                        {URDU_LABELS.general.print}
-                    </button>
-                </div>
-                
-                {/* Printable Content Area */}
-                <div className="p-4 sm:p-6 print-container" id="printable-content">
-                    {/* Print Header (Only for Print) */}
-                    <div className="hidden print:block header">
-                        <h1 className="font-extrabold text-3xl">{URDU_LABELS.appName}</h1>
-                        <p className="text-sm">{URDU_LABELS.tagline}</p>
-                        <p className='mt-2 text-xl font-bold'>گاہک کا مکمل ریکارڈ</p>
-                    </div>
+  const handlePrint = () => {
+    if (printRef.current) window.print();
+  };
 
-                    {/* Customer Details */}
-                    <div className="section">
-                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">خریدار کی تفصیلات</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
-                            <InfoRow label={URDU_LABELS.fields.accountNumber} value={details.account_number} />
-                            <InfoRow label={URDU_LABELS.fields.customerName} value={details.customer_name} />
-                            <InfoRow label={URDU_LABELS.fields.fatherName} value={details.father_name} />
-                            <InfoRow label={URDU_LABELS.fields.phone} value={details.phone} />
-                            <InfoRow label={URDU_LABELS.fields.cnic} value={details.cnic} />
-                            <div className="md:col-span-2 print:col-span-3">
-                                <InfoRow label={URDU_LABELS.fields.address} value={details.address} />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Guarantor Details */}
-                    <div className="section">
-                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">{URDU_LABELS.fields.guarantor1}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
-                            <InfoRow label={URDU_LABELS.fields.customerName} value={details.guarantor1_details.name} />
-                            <InfoRow label={URDU_LABELS.fields.fatherName} value={details.guarantor1_details.father_name} />
-                            <InfoRow label={URDU_LABELS.fields.phone} value={details.guarantor1_details.phone} />
-                            <InfoRow label={URDU_LABELS.fields.cnic} value={details.guarantor1_details.cnic} />
-                            <div className="md:col-span-2 print:col-span-3">
-                                <InfoRow label={URDU_LABELS.fields.address} value={details.guarantor1_details.address} />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="section">
-                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">{URDU_LABELS.fields.guarantor2}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
-                            <InfoRow label={URDU_LABELS.fields.customerName} value={details.guarantor2_details.name} />
-                            <InfoRow label={URDU_LABELS.fields.fatherName} value={details.guarantor2_details.father_name} />
-                            <InfoRow label={URDU_LABELS.fields.phone} value={details.guarantor2_details.phone} />
-                            <InfoRow label={URDU_LABELS.fields.cnic} value={details.guarantor2_details.cnic} />
-                            <div className="md:col-span-2 print:col-span-3">
-                                <InfoRow label={URDU_LABELS.fields.address} value={details.guarantor2_details.address} />
-                            </div>
-                        </div>
-                    </div>
+  const handleUpdateField = async (field: "registration_number" | "insurance_docs", value: string) => {
+    try {
+      setUpdating(true);
+      const { error } = await supabase
+        .from("vehicles")
+        .update({ [field]: value })
+        .eq("id", details.vehicle.id);
 
-                    {/* Vehicle Details */}
-                    <div className="section">
-                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">گاڑی اور مالی تفصیلات</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-3 print:gap-2">
-                            <InfoRow label={URDU_LABELS.fields.itemName} value={details.vehicle.item_name} />
-                            <InfoRow label={URDU_LABELS.fields.model} value={details.vehicle.model} />
-                            <InfoRow label={URDU_LABELS.fields.registrationNumber} value={details.vehicle.registration_number} />
-                            <InfoRow label={URDU_LABELS.fields.engineNumber} value={details.vehicle.engine_number} />
-                            <InfoRow label={URDU_LABELS.fields.chassisNumber} value={details.vehicle.chassis_number} />
-                            <InfoRow label={URDU_LABELS.fields.color} value={details.vehicle.color} />
-                            <InfoRow label={URDU_LABELS.fields.totalAmount} value={details.vehicle.total_amount} />
-                            <InfoRow label={URDU_LABELS.fields.advance} value={details.vehicle.advance_payment} />
-                            <InfoRow label={URDU_LABELS.fields.monthlyInstallment} value={details.vehicle.monthly_installment} />
-                            <InfoRow label={URDU_LABELS.fields.installmentPlan} value={details.vehicle.installment_plan} />
-                            <InfoRow label={URDU_LABELS.general.bakaya} value={details.vehicle.remaining_loan} className="font-extrabold text-red-700 print:text-red-800" />
-                            <InfoRow label={URDU_LABELS.general.dueDate} value={details.vehicle.next_due_date} className="font-extrabold text-amber-700 print:text-amber-800" />
-                        </div>
-                    </div>
-                    
-                    {/* Payment Summary */}
-                    <div className="section mt-6">
-                        <h2 className="text-3xl font-extrabold text-green-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">مالی حساب</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
-                            <div className='p-3 bg-green-100 rounded-xl shadow-inner print:p-2 print:bg-slate-100 print:shadow-none print:border'>
-                                <p className='text-lg font-bold text-green-700 print:text-sm print:text-slate-800'>{URDU_LABELS.general.totalPaid}</p>
-                                <p className='text-3xl font-extrabold text-green-900 mt-1 print:text-xl print:font-bold print:text-green-700'>{totalPaidAmount.toLocaleString('en-US')}</p>
-                            </div>
-                            <div className='p-3 bg-blue-100 rounded-xl shadow-inner print:p-2 print:bg-slate-100 print:shadow-none print:border'>
-                                <p className='text-lg font-bold text-blue-700 print:text-sm print:text-slate-800'>{URDU_LABELS.general.paid} ({URDU_LABELS.fields.totalInstallment})</p>
-                                <p className='text-3xl font-extrabold text-blue-900 mt-1 print:text-xl print:font-bold print:text-blue-700'>{details.totalPaidCount} / {planLength}</p>
-                            </div>
-                            <div className='p-3 bg-red-100 rounded-xl shadow-inner print:p-2 print:bg-slate-100 print:shadow-none print:border'>
-                                <p className='text-lg font-bold text-red-700 print:text-sm print:text-slate-800'>{URDU_LABELS.general.remaining} ({URDU_LABELS.fields.totalInstallment})</p>
-                                <p className='text-3xl font-extrabold text-red-900 mt-1 print:text-xl print:font-bold print:text-red-700'>{remainingCount < 0 ? 0 : remainingCount}</p>
-                            </div>
-                        </div>
-                    </div>
+      if (error) throw error;
+      showMessage("ریکارڈ کامیابی سے اپڈیٹ ہو گیا ✅", "success");
+    } catch (err) {
+      console.error(err);
+      showMessage("اپڈیٹ ناکام رہی ❌", "error");
+    } finally {
+      setUpdating(false);
+    }
+  };
 
-                    {/* Installment History */}
-                    <div className="section mt-8">
-                        <h2 className="text-3xl font-extrabold text-slate-700 mb-4 border-b-2 pb-1 print:text-lg print:border-b print:pb-0">{URDU_LABELS.general.history}</h2>
-                        <InstallmentHistoryTree history={details.history} isPrintView={true} />
-                    </div>
-                </div>
-
-            </div>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" dir="rtl">
+      <div
+        ref={printRef}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6 relative"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center border-b-4 border-amber-500 pb-4 mb-6">
+          <h2 className="text-3xl font-extrabold text-amber-700">مکمل تفصیلات</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrint}
+              className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-bold"
+            >
+              <Printer className="inline ml-2" size={20} />
+              پرنٹ
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold"
+            >
+              <X className="inline ml-2" size={20} />
+              بند کریں
+            </button>
+          </div>
         </div>
-    );
+
+        {/* Customer Info */}
+        <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-slate-300 mb-4 pb-1">خریدار کی تفصیلات</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <InfoRow label="اکاؤنٹ نمبر" value={details.account_number} />
+          <InfoRow label="نام" value={details.customer_name} />
+          <InfoRow label="والد کا نام" value={details.father_name} />
+          <InfoRow label="فون نمبر" value={details.phone} />
+          <InfoRow label="شناختی کارڈ نمبر" value={details.cnic} />
+          <div className="md:col-span-2">
+            <InfoRow label="پتہ" value={details.address} />
+          </div>
+        </div>
+
+        {/* Vehicle Info */}
+        <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-slate-300 mb-4 pb-1">گاڑی کی تفصیلات</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <InfoRow label="گاڑی کا نام" value={details.vehicle.item_name} />
+          <InfoRow label="ماڈل" value={details.vehicle.model} />
+          <InfoRow label="رنگ" value={details.vehicle.color} />
+          <InfoRow label="انجن نمبر" value={details.vehicle.engine_number} />
+          <InfoRow label="چیسس نمبر" value={details.vehicle.chassis_number} />
+        </div>
+
+        {/* Editable Fields */}
+        <div className="mt-6 border-t pt-4">
+          <h3 className="text-xl font-bold text-amber-700 mb-3">قابلِ ترمیم فیلڈز</h3>
+
+          {/* Registration Number */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+            <label className="font-bold text-slate-700 w-40">رجسٹریشن نمبر:</label>
+            <input
+              type="text"
+              value={registration}
+              onChange={(e) => setRegistration(e.target.value)}
+              className="border border-slate-300 rounded-lg p-2 flex-1 focus:ring-2 focus:ring-amber-400 outline-none"
+            />
+            <button
+              onClick={() => handleUpdateField("registration_number", registration)}
+              disabled={updating}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold disabled:bg-blue-400"
+            >
+              {updating ? "اپڈیٹ ہو رہا ہے..." : "اپڈیٹ کریں"}
+            </button>
+          </div>
+
+          {/* Insurance Docs */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="font-bold text-slate-700 w-40">انشورنس دستاویزات:</label>
+            <input
+              type="text"
+              value={insurance}
+              onChange={(e) => setInsurance(e.target.value)}
+              className="border border-slate-300 rounded-lg p-2 flex-1 focus:ring-2 focus:ring-amber-400 outline-none"
+            />
+            <button
+              onClick={() => handleUpdateField("insurance_docs", insurance)}
+              disabled={updating}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold disabled:bg-blue-400"
+            >
+              {updating ? "اپڈیٹ ہو رہا ہے..." : "اپڈیٹ کریں"}
+            </button>
+          </div>
+        </div>
+
+        {/* Guarantor 1 */}
+        <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-slate-300 mt-8 mb-4 pb-1">ضامن نمبر 1</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <InfoRow label="نام" value={details.guarantor1_details?.name} />
+          <InfoRow label="والد کا نام" value={details.guarantor1_details?.father_name} />
+          <InfoRow label="فون نمبر" value={details.guarantor1_details?.phone} />
+          <InfoRow label="شناختی کارڈ نمبر" value={details.guarantor1_details?.cnic} />
+          <div className="md:col-span-2">
+            <InfoRow label="پتہ" value={details.guarantor1_details?.address} />
+          </div>
+        </div>
+
+        {/* Guarantor 2 */}
+        <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-slate-300 mb-4 pb-1">ضامن نمبر 2</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <InfoRow label="نام" value={details.guarantor2_details?.name} />
+          <InfoRow label="والد کا نام" value={details.guarantor2_details?.father_name} />
+          <InfoRow label="فون نمبر" value={details.guarantor2_details?.phone} />
+          <InfoRow label="شناختی کارڈ نمبر" value={details.guarantor2_details?.cnic} />
+          <div className="md:col-span-2">
+            <InfoRow label="پتہ" value={details.guarantor2_details?.address} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // =========================================================================
-//                  UPDATED COMPONENT: RenderAllRecords (with Delete)
+//                  CLEAN VERSION: RenderAllRecords (No Calculation)
 // =========================================================================
 
 interface RenderAllRecordsProps {
@@ -1244,8 +1222,14 @@ interface RenderAllRecordsProps {
   handleFetchAllCustomers: () => Promise<void>;
   handleViewDetails: (customerId: string) => Promise<void>;
 }
-const showMessage = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
-  alert(`${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${text}`);
+
+const showMessage = (
+  text: string,
+  type: "success" | "error" | "info" = "info"
+) => {
+  alert(
+    `${type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️"} ${text}`
+  );
 };
 
 const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
@@ -1257,7 +1241,7 @@ const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [deleting, setDeleting] = useState<string | null>(null); // Track deleting record
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // ✅ DELETE FUNCTION
   const handleDeleteRecord = async (customerId: string) => {
@@ -1267,19 +1251,14 @@ const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
     try {
       setDeleting(customerId);
 
-      // 1️⃣ Delete related installments first (to avoid foreign key conflict)
-      await supabase.from("installments").delete().eq("customer_id", customerId);
-
-      // 2️⃣ Delete related vehicles
+      // Vehicles delete
       await supabase.from("vehicles").delete().eq("customer_id", customerId);
-
-      // 3️⃣ Delete main customer record
+      // Customer delete
       const { error } = await supabase.from("customers").delete().eq("id", customerId);
       if (error) throw error;
 
-      // 4️⃣ Update local state instantly
       showMessage("ریکارڈ کامیابی سے حذف ہو گیا ✅", "success");
-      await handleFetchAllCustomers(); // refresh records
+      await handleFetchAllCustomers();
     } catch (error: any) {
       console.error("Delete Error:", error);
       showMessage("ریکارڈ حذف نہیں ہو سکا ❌", "error");
@@ -1288,27 +1267,27 @@ const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
     }
   };
 
-  // ✅ Filter logic
+  // ✅ FILTER LOGIC
   const filteredRecords = useMemo(() => {
     let records = customerRecords;
 
     if (startDate && endDate) {
-      records = records.filter((record) => {
-        const recordDate = new Date(record.created_at);
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      records = records.filter((r) => {
+        const recordDate = new Date(r.created_at);
         return recordDate >= start && recordDate <= end;
       });
     }
 
     if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
+      const lower = searchTerm.toLowerCase();
       records = records.filter(
-        (record) =>
-          record.customer_name.toLowerCase().includes(lowerSearchTerm) ||
-          record.account_number.toLowerCase().includes(lowerSearchTerm) ||
-          record.vehicle_name.toLowerCase().includes(lowerSearchTerm)
+        (r) =>
+          r.customer_name.toLowerCase().includes(lower) ||
+          r.account_number.toLowerCase().includes(lower) ||
+          (r.vehicle_name && r.vehicle_name.toLowerCase().includes(lower))
       );
     }
 
@@ -1319,14 +1298,18 @@ const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
     handleFetchAllCustomers();
   }, [handleFetchAllCustomers]);
 
+  // ✅ RENDER UI
   return (
-    <div className="p-4 sm:p-8 bg-white rounded-2xl shadow-2xl max-w-7xl mx-auto" dir="rtl">
-      <h2 className="text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-200">
-        {URDU_LABELS.general.allRecords}
+    <section
+      className="px-4 sm:px-8 py-6 bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl shadow-2xl max-w-7xl mx-auto border border-slate-200"
+      dir="rtl"
+    >
+      <h2 className="text-3xl sm:text-5xl font-extrabold text-center text-amber-700 mb-8 pb-4 border-b-4 border-amber-300">
+        تمام صارفین اور گاڑیوں کا ریکارڈ
       </h2>
 
-      {/* Controls */}
-      <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 mb-8">
+      {/* 🔍 Filters */}
+      <div className="p-4 mb-8 bg-white border border-slate-200 rounded-2xl shadow-md">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <FormField
             label="شروع کی تاریخ"
@@ -1342,130 +1325,103 @@ const RenderAllRecords: React.FC<RenderAllRecordsProps> = ({
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
-          <div className="flex items-end mb-6 md:mb-0">
+          <div className="flex items-end">
             <button
               onClick={handleFetchAllCustomers}
               disabled={loading}
-              className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold p-3 rounded-xl transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-500"
+              className="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold p-3 rounded-xl transition duration-300 text-base sm:text-lg disabled:bg-slate-500"
             >
-              <Clock size={20} className="ml-2" />
               {loading ? "ڈیٹا لوڈ ہو رہا ہے..." : "ڈیٹا دوبارہ لوڈ کریں"}
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-3">
-            <FormField
-              label="نام، اکاؤنٹ یا گاڑی سے تلاش کریں"
-              name="searchTerm"
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="تلاش کی کلید درج کریں"
-            />
-          </div>
-        </div>
+        <FormField
+          label="نام، اکاؤنٹ یا گاڑی سے تلاش کریں"
+          name="searchTerm"
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="تلاش کی کلید درج کریں"
+        />
       </div>
 
-      {/* Data Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-slate-300 rounded-xl shadow-lg">
+      {/* 📋 Table */}
+      <div className="overflow-x-auto border border-slate-300 rounded-2xl shadow-lg bg-white">
+        <table className="min-w-full text-sm sm:text-base text-slate-800">
           <thead className="bg-slate-800 text-white">
             <tr>
-              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
-                {URDU_LABELS.fields.recordDate}
-              </th>
-              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
-                {URDU_LABELS.fields.accountNumber}
-              </th>
-              <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">
-                {URDU_LABELS.fields.customerName}
-              </th>
-              <th className="py-3 px-4 text-right text-xl font-bold border-l border-slate-700">
-                {URDU_LABELS.fields.vehicleName}
-              </th>
-              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
-                {URDU_LABELS.fields.remainingAuto} ({URDU_LABELS.fields.totalLoan})
-              </th>
-              <th className="py-3 px-4 text-center text-xl font-bold border-l border-slate-700">
-                {URDU_LABELS.fields.status}
-              </th>
-              <th className="py-3 px-4 text-center text-xl font-bold">Actions</th>
+              <th className="py-3 px-4 text-center font-bold">تاریخ</th>
+              <th className="py-3 px-4 text-center font-bold">اکاؤنٹ نمبر</th>
+              <th className="py-3 px-4 text-right font-bold">صارف کا نام</th>
+              <th className="py-3 px-4 text-right font-bold">گاڑی / آئٹم</th>
+              <th className="py-3 px-4 text-center font-bold">عمل</th>
             </tr>
           </thead>
 
           <tbody>
-            {loading && (
+            {loading ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-2xl text-slate-500">
+                <td colSpan={5} className="py-8 text-center text-lg text-slate-500">
                   ڈیٹا لوڈ ہو رہا ہے...
                 </td>
               </tr>
-            )}
-
-            {!loading && filteredRecords.length === 0 && (
+            ) : filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-2xl text-red-500">
-                  {URDU_LABELS.general.notFound}
+                <td colSpan={5} className="py-8 text-center text-lg text-red-500">
+                  کوئی ریکارڈ نہیں ملا۔
                 </td>
               </tr>
-            )}
-
-            {filteredRecords.map((record, index) => (
-              <tr
-                key={record.id}
-                className={`border-b border-slate-200 hover:bg-slate-50 transition duration-150 ${
-                  index % 2 === 0 ? "bg-white" : "bg-slate-100"
-                }`}
-              >
-                <td className="py-3 px-4 text-center text-lg text-slate-600 border-l">
-                  {new Date(record.created_at).toLocaleDateString("ur-PK")}
-                </td>
-                <td className="py-3 px-4 text-center text-lg font-bold text-amber-700 border-l">
-                  {record.account_number}
-                </td>
-                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
-                  {record.customer_name}
-                </td>
-                <td className="py-3 px-4 text-right text-lg text-slate-800 font-medium border-l">
-                  {record.vehicle_name}
-                </td>
-                <td className="py-3 px-4 text-center text-lg font-extrabold text-red-600 border-l">
-                  {record.remaining_loan.toLocaleString("en-US")}
-                </td>
-                <td
-                  className={`py-3 px-4 text-center text-lg font-bold border-l ${
-                    record.remaining_loan <= 0 ? "text-green-600" : "text-amber-600"
-                  }`}
+            ) : (
+              filteredRecords.map((record, i) => (
+                <tr
+                  key={record.id}
+                  className={`transition duration-150 ${
+                    i % 2 === 0 ? "bg-white" : "bg-slate-50"
+                  } hover:bg-amber-50 border-b border-slate-200`}
                 >
-                  {record.remaining_loan <= 0 ? "ادا ہو گیا" : "جاری ہے"}
-                </td>
-                <td className="py-3 px-4 text-center flex gap-2 justify-center">
-                  <button
-                    onClick={() => handleViewDetails(record.id)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200"
-                  >
-                    {URDU_LABELS.general.viewDetails}
-                  </button>
+                  <td className="py-3 px-4 text-center text-slate-600">
+                    {new Date(record.created_at).toLocaleDateString("ur-PK")}
+                  </td>
+                  <td className="py-3 px-4 text-center text-amber-700 font-bold">
+                    {record.account_number}
+                  </td>
+                  <td className="py-3 px-4 text-right font-medium text-slate-800">
+                    {record.customer_name}
+                  </td>
+                  <td className="py-3 px-4 text-right text-slate-800">
+                    {record.vehicle_name || "—"}
+                  </td>
+                  <td className="py-3 px-4 flex flex-col sm:flex-row gap-2 justify-center">
+                    <button
+                      onClick={() => handleViewDetails(record.id)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition duration-200 w-full sm:w-auto"
+                    >
+                      تفصیلات
+                    </button>
 
-                  <button
-                    onClick={() => handleDeleteRecord(record.id)}
-                    disabled={deleting === record.id}
-                    className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200 disabled:bg-red-400"
-                  >
-                    {deleting === record.id ? "حذف ہو رہا ہے..." : "Delete"}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    <button
+                      onClick={() => handleDeleteRecord(record.id)}
+                      disabled={deleting === record.id}
+                      className={`text-white text-sm font-semibold py-2 px-4 rounded-lg transition duration-200 w-full sm:w-auto ${
+                        deleting === record.id
+                          ? "bg-red-400 cursor-not-allowed"
+                          : "bg-red-600 hover:bg-red-700"
+                      }`}
+                    >
+                      {deleting === record.id ? "حذف ہو رہا ہے..." : "حذف کریں"}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 };
-
+ 
 
 // =========================================================================
 //                             LOGIN SCREEN
@@ -1815,91 +1771,67 @@ const handleSearchCustomer = useCallback(async (accountNumber: string) => {
 
   
 
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setLoading(true);
-      setMessage({ text: '', type: '' });
-      
-      if (!fetchedCustomer || !fetchedCustomer.id) {
-          showMessage("پہلے اکاؤنٹ نمبر تلاش کریں اور یقینی بنائیں کہ صارف رجسٹرڈ ہے۔", 'error');
-          setLoading(false);
-          return;
-      }
-      
-      const {
-        totalAmount, advance, remainingAuto, monthlyInstallment, installmentPlan,
-        itemName, engineNumber, chassisNumber, registrationNumber, date, model, color, insuranceDocs
-      } = paymentForm;
+const handlePaymentSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setMessage({ text: "", type: "" });
 
-      const nextDueDateObj = new Date(date);
-      // Next due date for the first official installment is one month after the advance payment date.
-      const newDueDate = new Date(nextDueDateObj.setMonth(nextDueDateObj.getMonth() + 1)).toISOString().substring(0, 10);
-      
-      // 1. گاڑی کا ریکارڈ محفوظ کریں (Insert into 'vehicles' table)
-      const vehicleData = {
-        customer_id: fetchedCustomer.id,
-        registration_number: registrationNumber,
-        item_name: itemName,
-        engine_number: engineNumber,
-        chassis_number: chassisNumber,
-        model: model,
-        color: color,
-        insurance_docs: insuranceDocs,
-        total_amount: totalAmount,
-        advance_payment: advance, // Save advance here
-        remaining_loan: remainingAuto, // This is the starting loan after advance
-        monthly_installment: monthlyInstallment,
-        installment_plan: installmentPlan,
-        next_due_date: remainingAuto > 0 ? newDueDate : null, // Set to null if loan is already 0
-      };
+  // ✅ Ensure a valid customer is selected before saving
+  if (!fetchedCustomer || !fetchedCustomer.id) {
+    showMessage(
+      "پہلے اکاؤنٹ نمبر تلاش کریں اور یقینی بنائیں کہ صارف رجسٹرڈ ہے۔",
+      "error"
+    );
+    setLoading(false);
+    return;
+  }
 
-      const { data: vehicleInsert, error: vehicleError } = await supabase
-        .from('vehicles')
-        .insert([vehicleData])
-        .select('id')
-        .single();
-        
-      if (vehicleError || !(vehicleInsert as any)?.id) {
-        console.error("Supabase Vehicle Error:", vehicleError);
-        showMessage(URDU_LABELS.general.error + " گاڑی کا ڈیٹا محفوظ نہیں ہو سکا۔", 'error');
-        setLoading(false);
-        return;
-      }
-      
-      const vehicleId = (vehicleInsert as any).id as string;
-      
-      // 2. ایڈوانس پیمنٹ کو پہلی قسط کے طور پر ریکارڈ کریں (Insert into 'installments' table)
-      
-      // We insert the advance payment record first.
-      if (advance > 0 || remainingAuto <= 0) { // Always save an installment record if advance > 0 OR loan is 0 (fully paid)
-        const installmentData = {
-            vehicle_id: vehicleId,
-            payment_date: date,
-            amount_paid: advance,
-            paid_count: remainingAuto <= 0 ? (installmentPlan === '12 Months' ? 12 : 24) : 0, // Set to max count if fully paid, otherwise 0
-            remaining_balance: remainingAuto,
-        };
+  // ✅ Extract only basic vehicle fields
+  const {
+    itemName,
+    engineNumber,
+    chassisNumber,
+    registrationNumber,
+    date,
+    model,
+    color,
+    insuranceDocs,
+  } = paymentForm;
 
-        const { error: installmentError } = await supabase
-            .from('installments')
-            .insert([installmentData]);
-
-        if (installmentError) {
-            console.error("Supabase Installment Error:", installmentError);
-            showMessage(URDU_LABELS.general.error + " ایڈوانس پیمنٹ محفوظ نہیں ہو سکی۔", 'error');
-        } else {
-            showMessage(URDU_LABELS.general.success + " ادائیگی اور گاڑی کا ڈیٹا محفوظ ہو گیا!", 'success');
-            setPaymentForm(paymentFormInitialState);
-            setFetchedCustomer(null);
-        }
-      } else {
-          showMessage(URDU_LABELS.general.success + " گاڑی کا ڈیٹا محفوظ ہو گیا!", 'success');
-          setPaymentForm(paymentFormInitialState);
-          setFetchedCustomer(null);
-      }
-      
-      setLoading(false);
+  // ✅ Prepare vehicle data (no financial fields)
+  const vehicleData = {
+    customer_id: fetchedCustomer.id,
+    registration_number: registrationNumber || null,
+    item_name: itemName || null,
+    engine_number: engineNumber || null,
+    chassis_number: chassisNumber || null,
+    model: model || null,
+    color: color || null,
+    insurance_docs: insuranceDocs || null,
+    created_at: date || new Date().toISOString(),
   };
+
+  // ✅ Insert record in Supabase
+  const { error } = await supabase.from("vehicles").insert([vehicleData]);
+
+  if (error) {
+    console.error("Supabase Error:", error);
+    showMessage(
+      URDU_LABELS.general.error + " " + (error as any).message,
+      "error"
+    );
+  } else {
+    showMessage(
+      URDU_LABELS.general.success + " گاڑی کا ڈیٹا محفوظ ہو گیا!",
+      "success"
+    );
+    setPaymentForm(paymentFormInitialState);
+    setFetchedCustomer(null);
+  }
+
+  setLoading(false);
+};
+
   
 const handleInstallmentPaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2318,154 +2250,123 @@ function calculateRemainingBalanceAndCounts(
 
 // ✅ Fixed Function — Fetch All Records with Correct Remaining Balance
 const handleFetchAllCustomers = useCallback(async () => {
-    setLoading(true);
-    setCustomerRecords([]);
-    setMessage({ text: '', type: '' });
+  setLoading(true);
+  setCustomerRecords([]);
+  setMessage({ text: "", type: "" });
 
-    try {
-        // 1️⃣ Fetch all customers with their vehicles
-        const { data: customersData, error: cError } = await supabase
-            .from("customers")
-            .select(`
-                id, 
-                account_number, 
-                customer_name, 
-                created_at,
-                vehicles (
-                    id,
-                    item_name,
-                    total_amount,
-                    advance_payment,
-                    installment_plan,
-                    remaining_loan,
-                    monthly_installment,
-                    created_at
-                )
-            `)
-            .order("created_at", { ascending: false });
+  try {
+    // 1️⃣ Fetch all customers with their vehicles (basic fields only)
+    const { data: customersData, error } = await supabase
+      .from("customers")
+      .select(`
+        id,
+        account_number,
+        customer_name,
+        created_at,
+        vehicles (
+          id,
+          item_name,
+          model,
+          color,
+          registration_number,
+          engine_number,
+          chassis_number,
+          insurance_docs,
+          created_at
+        )
+      `)
+      .order("created_at", { ascending: false });
 
-        if (cError) throw cError;
+    if (error) throw error;
 
-        // 2️⃣ Prepare results array
-        const updatedRecords: CustomerRecord[] = [];
+    // 2️⃣ Prepare simple flat data (no calculations)
+    const updatedRecords: any[] = [];
 
-        // 3️⃣ Loop through customers
-        for (const customer of customersData || []) {
-            const vehicles = customer.vehicles || [];
-            if (vehicles.length === 0) continue;
-
-            // Sort to get latest vehicle
-            const latestVehicle = vehicles.sort(
-                (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0];
-
-            // 4️⃣ Fetch Installment History
-            const { data: historyRaw } = await supabase
-                .from("installments")
-                .select("amount_paid, paid_count, remaining_balance, payment_date")
-                .eq("vehicle_id", latestVehicle.id)
-                .order("payment_date", { ascending: true });
-
-            const historyList: InstallmentHistory[] = (historyRaw || []) as InstallmentHistory[];
-
-            // 5️⃣ Use shared balance calculation logic
-            const { 
-                remainingLoan, 
-                totalPaidAmount, 
-                totalPaidCount, 
-                remainingCount 
-            } = calculateRemainingBalanceAndCounts(
-                latestVehicle.total_amount,
-                latestVehicle.advance_payment,
-                latestVehicle.installment_plan,
-                historyList
-            );
-
-            // 6️⃣ Push record for display
-            updatedRecords.push({
-                id: customer.id,
-                account_number: customer.account_number,
-                customer_name: customer.customer_name,
-                vehicle_name: latestVehicle.item_name,
-                remaining_loan: remainingLoan, // ✅ Correct balance
-                total_paid: totalPaidAmount, // ✅ NEW optional field
-                paid_count: totalPaidCount,
-                remaining_count: remainingCount,
-                monthly_installment: latestVehicle.monthly_installment,
-                created_at: customer.created_at
-            });
-        }
-
-        // 7️⃣ Update State
-        setCustomerRecords(updatedRecords);
-        showMessage("تمام ریکارڈز کامیابی سے لوڈ ہو گئے ✅", "success");
-    } catch (error: any) {
-        console.error("Supabase All Customers Error:", error);
-        showMessage(
-            URDU_LABELS.general.error + " تمام ریکارڈز لوڈ نہیں ہو سکے۔",
-            "error"
-        );
-    } finally {
-        setLoading(false);
+    for (const customer of customersData || []) {
+      const vehicles = customer.vehicles || [];
+      if (vehicles.length === 0) {
+        // Customer without vehicle (still show)
+        updatedRecords.push({
+          id: customer.id,
+          account_number: customer.account_number,
+          customer_name: customer.customer_name,
+          vehicle_name: "— کوئی گاڑی درج نہیں —",
+          model: "",
+          color: "",
+          registration_number: "",
+          created_at: customer.created_at,
+        });
+      } else {
+        // Each vehicle of the customer
+        vehicles.forEach((v: any) => {
+          updatedRecords.push({
+            id: customer.id,
+            account_number: customer.account_number,
+            customer_name: customer.customer_name,
+            vehicle_name: v.item_name || "",
+            model: v.model || "",
+            color: v.color || "",
+            registration_number: v.registration_number || "",
+            created_at: v.created_at,
+          });
+        });
+      }
     }
+
+    // 3️⃣ Update state and show message
+    setCustomerRecords(updatedRecords);
+    showMessage("تمام ریکارڈ کامیابی سے لوڈ ہو گئے ✅", "success");
+  } catch (err) {
+    console.error("Supabase Error:", err);
+    showMessage("ریکارڈ لوڈ کرنے میں مسئلہ ہوا۔", "error");
+  } finally {
+    setLoading(false);
+  }
 }, []);
 
   
-  // NEW: Fetch Full Details for Printable View
+// ✅ Simplified Full Details Fetch — No Calculations
 const handleFetchFullDetails = async (customerId: string) => {
   setLoading(true);
   setFullDetails(null);
   setMessage({ text: "", type: "" });
 
   try {
-    // 1️⃣ Fetch Customer + Vehicle Details
-    const { data: customerDataRaw, error: cError } = await supabase
+    const { data: customerDataRaw, error } = await supabase
       .from("customers")
       .select(`
-        id, 
-        account_number, 
-        customer_name, 
-        father_name, 
-        phone, 
-        cnic, 
+        id,
+        account_number,
+        customer_name,
+        father_name,
+        phone,
+        cnic,
         address,
-        guarantor1_details, 
+        guarantor1_details,
         guarantor2_details,
         vehicles (
-          id, 
-          item_name, 
-          registration_number, 
-          engine_number, 
-          chassis_number, 
-          model, 
-          color, 
+          id,
+          item_name,
+          registration_number,
+          engine_number,
+          chassis_number,
+          model,
+          color,
           insurance_docs,
-          total_amount, 
-          advance_payment, 
-          remaining_loan, 
-          monthly_installment, 
-          installment_plan, 
-          next_due_date, 
           created_at
         )
       `)
       .eq("id", customerId)
-      .limit(1)
       .single();
 
-    if (cError || !customerDataRaw) {
-      console.error("Supabase Full Details Error:", cError);
-      showMessage(URDU_LABELS.general.notFound, "error");
+    if (error || !customerDataRaw) {
+      showMessage("ریکارڈ نہیں ملا ❌", "error");
       setLoading(false);
       return;
     }
 
-    // 2️⃣ Extract Latest Vehicle
     const customerData = customerDataRaw as any;
-    const latestVehicle = customerData.vehicles?.sort(
-      (a: any, b: any) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )[0];
+    const latestVehicle = customerData.vehicles?.[0] || null;
 
     if (!latestVehicle) {
       showMessage("گاڑی کا ریکارڈ نہیں ملا۔", "error");
@@ -2473,55 +2374,17 @@ const handleFetchFullDetails = async (customerId: string) => {
       return;
     }
 
-    // 3️⃣ Fetch Installment History
-    const { data: installmentHistoryRaw, error: iError } = await supabase
-      .from("installments")
-      .select("*")
-      .eq("vehicle_id", latestVehicle.id)
-      .order("payment_date", { ascending: true });
-
-    if (iError) throw iError;
-
-    const history: InstallmentHistory[] =
-      (installmentHistoryRaw as InstallmentHistory[]) || [];
-
-    // 4️⃣ Calculate Summary Data Using Common Function
-    const {
-      remainingLoan,
-      totalPaidAmount,
-      totalPaidCount,
-      remainingCount,
-      planLength,
-    } = calculateRemainingBalanceAndCounts(
-      latestVehicle.total_amount,
-      latestVehicle.advance_payment,
-      latestVehicle.installment_plan,
-      history
-    );
-
-    // 5️⃣ Calculate Total Installment Amount (For Summary Display)
-    const totalInstallmentAmount =
-      (latestVehicle.monthly_installment || 0) * planLength;
-
-    // 6️⃣ Build Full Details Object
+    // ✅ Combine and set to state
     const fullDetails: FullCustomerDetails = {
       ...customerData,
       vehicle: latestVehicle,
-      history: history,
-      totalPaidCount,
-      remainingCount,
-      totalPaidAmount,
-      totalInstallmentAmount,
-      planLength,
-      remainingLoan, // ✅ Added for print summary display
     };
 
-    // 7️⃣ Update State
     setFullDetails(fullDetails);
     showMessage("تفصیلات کامیابی سے حاصل ہو گئیں ✅", "success");
-  } catch (error: any) {
-    console.error("Full Details Fetch Error:", error);
-    showMessage(URDU_LABELS.general.error + " مکمل تفصیلات لوڈ نہیں ہو سکیں۔", "error");
+  } catch (err) {
+    console.error("Full Details Fetch Error:", err);
+    showMessage("تفصیلات لوڈ نہیں ہو سکیں ❌", "error");
   } finally {
     setLoading(false);
   }
