@@ -256,7 +256,7 @@ const URDU_LABELS = {
     model: "ماڈل",
     color: "رنگ",
     registrationNumber: "رجسٹریشن نمبر",
-    insuranceDocs: "انشورنس/کاغذات",
+    insuranceDocs: "کاغذات",
     installmentAmount: "قسط کی رقم",
     paymentDate: "قسط کی تاریخ",
     currentPlan: "موجودہ پلان",
@@ -1167,7 +1167,7 @@ const PrintableDetailsView: React.FC<PrintableDetailsViewProps> = ({ details, on
 
           {/* Insurance Docs */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <label className="font-bold text-slate-700 w-40">انشورنس دستاویزات:</label>
+            <label className="font-bold text-slate-700 w-40">دستاویزات:</label>
             <input
               type="text"
               value={insurance}
